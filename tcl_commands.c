@@ -446,7 +446,6 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 /*     print_headers(global_rr);
     flush_output_buffer(global_rr);  */
     memwrite(&obuffer, tble, strlen(tble));
-    ap_rputs(tble, global_rr);
     return TCL_OK;
 }
 
