@@ -23,10 +23,10 @@ COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNIN
 all: builddtcl_test shared
 
 static: $(OBJECTS) docs/documentation.html
-	$(TCL_STLIB_LD) $(STATICLIB) $(OBJECTS) 
+	$(TCL_STLIB_LD) $(STATICLIB) $(OBJECTS)
 
 shared: $(OBJECTS) docs/documentation.html
-	$(TCL_SHLIB_LD) -o $(SHLIB) $(OBJECTS) $(TCL_LIB_SPEC) $(TCL_LIBS)
+	$(TCL_SHLIB_LD) $(TCL_SHLIB_CFLAGS) -o $(SHLIB) $(OBJECTS) $(TCL_LIB_SPEC) $(TCL_LIBS)
 
 # I don't have too many C files, so it's just clearer to do things by
 # hand
@@ -46,10 +46,10 @@ parser.o: parser.c mod_dtcl.h parser.h
 channel.o: channel.c mod_dtcl.h channel.h
 	$(COMPILE)
 
-clean: 
+clean:
 	-rm -f $(STATICLIB) $(SHLIB) *.o *~ docs/documentation.txt docs/documentation.html
 
-version: 
+version:
 	./cvsversion.tcl
 
 docs/documentation.html:

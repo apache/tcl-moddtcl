@@ -18,7 +18,7 @@ static int inputproc(ClientData instancedata, char *buf, int toRead, int *errorC
 /* This is the output 'method' for the Memory Buffer Tcl 'File'
    Channel that we create to divert stdout to */
 
-static int outputproc(ClientData instancedata, char *buf, int toWrite, int *errorCodePtr)
+static int outputproc(ClientData instancedata, CONST84 char *buf, int toWrite, int *errorCodePtr)
 {
     dtcl_server_conf *dsc = (dtcl_server_conf *)instancedata;
     Tcl_DStringAppend(dsc->buffer, buf, toWrite);
@@ -34,7 +34,7 @@ static int closeproc(ClientData instancedata, Tcl_Interp *interp)
 }
 
 static int setoptionproc(ClientData instancedata, Tcl_Interp *interp,
-			 char *optionname, char *value)
+			 CONST84 char *optionname, CONST84 char *value)
 {
     return TCL_OK;
 }

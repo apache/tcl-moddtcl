@@ -330,7 +330,7 @@ static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r
                 print_error(r, 1, "<b>Tcl_ErrorScript failed!</b>");
         } else {
             /* default action  */
-            errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
+            errorinfo = (char *) Tcl_GetVar(interp, "errorInfo", 0);
             print_error(r, 0, errorinfo);
             print_error(r, 1, "<p><b>OUTPUT BUFFER:</b></p>");
             print_error(r, 0, Tcl_GetStringFromObj(outbuf, (int *)NULL));

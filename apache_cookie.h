@@ -1,3 +1,6 @@
+#ifndef _APACHE_COOKIE_H
+#define _APACHE_COOKIE_H
+
 #include "apache_request.h"
 
 typedef array_header ApacheCookieJar;
@@ -11,6 +14,10 @@ typedef struct {
     char *path;
     int secure;
 } ApacheCookie;
+
+#ifdef  __cplusplus
+ extern "C" {
+#endif 
 
 #define ApacheCookieJarItems(arr) arr->nelts
 
@@ -41,4 +48,10 @@ char *ApacheCookie_attr(ApacheCookie *c, char *key, char *val);
 char *ApacheCookie_expires(ApacheCookie *c, char *time_str);
 void ApacheCookie_bake(ApacheCookie *c);
 
+#ifdef __cplusplus
+ }
+#endif
+
 #define APC_ERROR APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, c->r
+
+#endif

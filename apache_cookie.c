@@ -1,5 +1,8 @@
 /* ====================================================================
- * Copyright (c) 1995-1999 The Apache Group.  All rights reserved.
+ * The Apache Software License, Version 1.1
+ *
+ * Copyright (c) 2000 The Apache Software Foundation.  All rights
+ * reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -13,46 +16,44 @@
  *    the documentation and/or other materials provided with the
  *    distribution.
  *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the Apache Group
- *    for use in the Apache HTTP server project (http://www.apache.org/)."
+ * 3. The end-user documentation included with the redistribution,
+ *    if any, must include the following acknowledgment:
+ *       "This product includes software developed by the
+ *        Apache Software Foundation (http://www.apache.org/)."
+ *    Alternately, this acknowledgment may appear in the software itself,
+ *    if and wherever such third-party acknowledgments normally appear.
  *
- * 4. The names "Apache Server" and "Apache Group" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    apache@apache.org.
+ * 4. The names "Apache" and "Apache Software Foundation" must
+ *    not be used to endorse or promote products derived from this
+ *    software without prior written permission. For written
+ *    permission, please contact apache@apache.org.
  *
- * 5. Products derived from this software may not be called "Apache"
- *    nor may "Apache" appear in their names without prior written
- *    permission of the Apache Group.
+ * 5. Products derived from this software may not be called "Apache",
+ *    nor may "Apache" appear in their name, without prior written
+ *    permission of the Apache Software Foundation.
  *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the Apache Group
- *    for use in the Apache HTTP server project (http://www.apache.org/)."
- *
- * THIS SOFTWARE IS PROVIDED BY THE APACHE GROUP ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE APACHE GROUP OR
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
  * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  * ====================================================================
  *
  * This software consists of voluntary contributions made by many
- * individuals on behalf of the Apache Group and was originally based
- * on public domain software written at the National Center for
- * Supercomputing Applications, University of Illinois, Urbana-Champaign.
- * For more information on the Apache Group and the Apache HTTP server
- * project, please see <http://www.apache.org/>.
+ * individuals on behalf of the Apache Software Foundation.  For more
+ * information on the Apache Software Foundation, please see
+ * <http://www.apache.org/>.
  *
+ * Portions of this software are based upon public domain software
+ * originally written at the National Center for Supercomputing Applications,
+ * University of Illinois, Urbana-Champaign.
  */
 
 #include "apache_cookie.h"
@@ -62,16 +63,15 @@ char *ApacheCookie_expires(ApacheCookie *c, char *time_str)
     char *expires;
 
     expires = ApacheUtil_expires(c->r->pool, time_str, EXPIRES_COOKIE);
-    if (expires) {
+    if (expires)
 	c->expires = expires;
-    }
 
     return c->expires;
 }
 
 #define cookie_get_set(thing,val) \
-retval = thing; \
-if(val) thing = ap_pstrdup(c->r->pool, val)
+    retval = thing; \
+    if(val) thing = ap_pstrdup(c->r->pool, val)
 
 char *ApacheCookie_attr(ApacheCookie *c, char *key, char *val)
 {
@@ -130,9 +130,9 @@ ApacheCookie *ApacheCookie_new(request_rec *r, ...)
     for(;;) {
 	char *key, *val;
 	key = va_arg(args, char *);
-	if (key == NULL) {
+	if (key == NULL)
 	    break;
-	}
+
 	val = va_arg(args, char *);
 	(void)ApacheCookie_attr(c, key, val);
     }
@@ -147,35 +147,36 @@ ApacheCookieJar *ApacheCookie_parse(request_rec *r, const char *data)
     ApacheCookieJar *retval =
 	ap_make_array(r->pool, 1, sizeof(ApacheCookie *));
 
-    if (!data) {
-	if (!(data = ap_table_get(r->headers_in, "Cookie"))) {
+    if (!data)
+	if (!(data = ap_table_get(r->headers_in, "Cookie")))
 	    return retval;
-	}
-    }
 
     while (*data && (pair = ap_getword(r->pool, &data, ';'))) {
 	const char *key, *val;
 	ApacheCookie *c;
 
-	while (ap_isspace(*data)) {
+	while (ap_isspace(*data))
 	    ++data;
-	}
+
 	key = ap_getword(r->pool, &pair, '=');
 	ap_unescape_url((char *)key);
 	c = ApacheCookie_new(r, "-name", key, NULL);
-	if (c->values) {
+
+	if (c->values)
 	    c->values->nelts = 0;
-	}
-	else {
+	else
 	    c->values = ap_make_array(r->pool, 4, sizeof(char *));
-	}
 
-	if (!*pair) {
+	if (!*pair)
 	    ApacheCookieAdd(c, "");
-	}
 
-	while (*pair && (val = ap_getword(r->pool, &pair, '&'))) {
+
+	while (*pair && (val = ap_getword_nulls(r->pool, &pair, '&'))) {
 	    ap_unescape_url((char *)val);
+#ifdef DEBUG
+	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r, 
+                          "[apache_cookie] added (%s)", val);
+#endif
 	    ApacheCookieAdd(c, val);
 	}
 	ApacheCookieJarAdd(retval, c);
@@ -188,7 +189,7 @@ ApacheCookieJar *ApacheCookie_parse(request_rec *r, const char *data)
     *(char **)ap_push_array(arr) = (char *)val
 
 #define cookie_push_named(arr, name, val) \
-    if(val) { \
+    if(val && strlen(val) > 0) { \
         cookie_push_arr(arr, ap_pstrcat(p, name, "=", val, NULL)); \
     }
 
@@ -198,6 +199,7 @@ static char * escape_url(pool *p, char *val)
   char *end = result + strlen(result);
   char *seek;
 
+  /* touchup result to ensure that special chars are escaped */
   for ( seek = end-1; seek >= result; --seek) {
     char *ptr, *replacement;
 
@@ -215,10 +217,8 @@ static char * escape_url(pool *p, char *val)
 	continue; /* next for() */
     }
 
-
-    for (ptr = end; ptr > seek; --ptr) {
-      ptr[2] = ptr[0];
-    }
+    for (ptr = end; ptr > seek; --ptr)
+        ptr[2] = ptr[0];
 
     strncpy(seek, replacement, 3);
     end += 2;
@@ -234,9 +234,8 @@ char *ApacheCookie_as_string(ApacheCookie *c)
     char *cookie, *retval;
     int i;
 
-    if (!c->name) {
+    if (!c->name)
 	return "";
-    }
 
     values = ap_make_array(p, 6, sizeof(char *));
     cookie_push_named(values, "domain",  c->domain);
@@ -250,7 +249,7 @@ char *ApacheCookie_as_string(ApacheCookie *c)
     for (i=0; i<c->values->nelts; i++) {
 	cookie = ap_pstrcat(p, cookie,
 			    escape_url(p, ((char**)c->values->elts)[i]),
-			    (i < (c->values->nelts-1) ? "&" : NULL),
+			    (i < (c->values->nelts -1) ? "&" : NULL),
 			    NULL);
     }
 

@@ -1,3 +1,13 @@
+libapache-mod-dtcl (1.0.0-1) unstable; urgency=low
+
+  * Cleanup after HEAD requests.
+
+  * Make changes necessary for Tcl 8.4 compatibility.
+
+  * Update to latest httpd-apreq code.
+
+ --
+
 libapache-mod-dtcl (0.12.1-1) unstable; urgency=low
 
    * tcl_commands.c (HGetVars): Don't call ap_clear_table, as it can

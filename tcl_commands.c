@@ -746,7 +746,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		    chan = Tcl_MakeFileChannel((ClientData)fileno(
 			ApacheUpload_FILE(upload)), TCL_READABLE);
 		    Tcl_RegisterChannel(interp, chan);
-		    channelname = Tcl_GetChannelName(chan);
+		    channelname = (char *)Tcl_GetChannelName(chan);
 		    Tcl_SetStringObj(result, channelname, -1);
 		}
 	    } else if (!strcmp(method, "save")) {
@@ -794,7 +794,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		    char *bytes = NULL;
 		    Tcl_Channel chan = NULL;
 
-		    bytes = Tcl_Alloc(ApacheUpload_size(upload));
+		    bytes = Tcl_Alloc((unsigned int)ApacheUpload_size(upload));
 		    chan = Tcl_MakeFileChannel((ClientData)fileno(
 			ApacheUpload_FILE(upload)), TCL_READABLE);
 		    Tcl_SetChannelOption(interp, chan, "-translation", "binary");

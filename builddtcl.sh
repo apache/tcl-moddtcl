@@ -43,7 +43,7 @@ INC=/usr/include/apache-1.3/  ######### CHANGEME ##########
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # INC=$APACHE/src/include
 
-if [ -f $INC/httpd.h ] 
+if [ -f $INC/httpd.h ]
     then
     echo "Apache includes in $INC"
     INCLUDES="-I$INC" ; export INCLUDES
@@ -61,18 +61,18 @@ echo "Using tclConfig.sh: $CONFIG"
 
 export TCLSH
 export TCL_CC
-export TCL_CFLAGS_DEBUG 
-export TCL_CFLAGS_OPTIMIZE 
-export TCL_CFLAGS_WARNING 
+export TCL_CFLAGS_DEBUG
+export TCL_CFLAGS_OPTIMIZE
+export TCL_CFLAGS_WARNING
 export TCL_EXTRA_CFLAGS
 export TCL_LIBS
-export TCL_LIB_FLAG 
+export TCL_LIB_FLAG
 export TCL_LIB_SPEC
 export TCL_PREFIX
 export TCL_SHLIB_CFLAGS
 export TCL_SHLIB_LD
 export TCL_SHLIB_SUFFIX
-export TCL_STLIB_LD 
+export TCL_STLIB_LD
 export TCL_SRC_DIR
 
 BUILDDTCL="YES" ; export BUILDDTCL
