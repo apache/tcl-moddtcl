@@ -57,13 +57,13 @@ typedef struct {
 int memwrite(obuff *, char *, int);
 int send_content(request_rec *);
 int send_parsed_file(request_rec *, char *, struct stat*, int);
+int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
 int send_tcl_file(request_rec *, char *, struct stat*);
 int set_header_type(request_rec *, char *);
 int print_headers(request_rec *);
 int print_error(request_rec *, int, char *);
 int flush_output_buffer(request_rec *);
 void tcl_init_stuff(server_rec *s, pool *p);
-
 char *StringToUtf(char *input);
 
 /* Macro to Tcl Objectify StringToUtf stuff */

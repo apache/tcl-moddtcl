@@ -328,7 +328,8 @@ char *StringToUtf(char *input)
 }
 
 /* Function to be used should we desire to upload files to a variable */
-int dtcl_upload_hook(void *ptr, char *buf, int len, const ApacheUpload *upload)
+
+int dtcl_upload_hook(void *ptr, char *buf, int len, ApacheUpload *upload)
 {
     Tcl_Interp *interp = ptr;
     static void *oldptr;
@@ -365,7 +366,7 @@ int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
     char *hashKey;
 
     Tcl_HashEntry *entry;
-    Tcl_Obj *cmdObjPtr;
+    Tcl_Obj *cmdObjPtr = NULL;
 
     Tcl_Interp *interp = GETREQINTERP(r);
 
@@ -425,24 +426,19 @@ int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
 	return TCL_ERROR;	
 	    
     end:
-	Tcl_EvalObj(interp, (cmdObjPtr));
+	return execute_and_check(interp, (cmdObjPtr), r);
     } else {
-	Tcl_EvalObj(interp, (Tcl_Obj *)Tcl_GetHashValue(entry));
+	return execute_and_check(interp, (Tcl_Obj *)Tcl_GetHashValue(entry), r);
     }
 #else
     Tcl_EvalFile(interp, r->filename);
 #endif /* 1 */
-    print_headers(global_rr);
-    flush_output_buffer(global_rr);
-
-    return OK;
 }
 
 /* Parse and execute a ttml file */
 
 int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int toplevel)
 {
-    char *errorinfo;
     char *hashKey;
     int isNew;
 
@@ -639,30 +635,44 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
     return OK;
 #endif
 
+    return(execute_and_check(interp, outbuf, r));
+}
+
+/* Calls Tcl_EvalObj() and checks for errors; prints the error buffer if any. */
+
+int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r)
+{
+    char *errorinfo;
+    dtcl_server_conf *dsc = NULL; 
+    
+    dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
+    
     if (Tcl_EvalObj(interp, outbuf) == TCL_ERROR)
-    {	
-	print_headers(global_rr);
-	flush_output_buffer(global_rr);
-	if (dsc->dtcl_error_script) 
-	{
-	    if (Tcl_EvalObj(interp, dsc->dtcl_error_script) == TCL_ERROR) 
-		print_error(r, 1, "<b>Tcl_ErrorScript failed!</b>");
-	} else {
-	    /* default action  */
-	    errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
-	    print_error(r, 0, errorinfo);
-	    print_error(r, 1, "<p><b>OUTPUT BUFFER:</b></p>");
-	    print_error(r, 0, Tcl_GetStringFromObj(outbuf, (int *)NULL));
-	}    
-/* 		    "</pre><b>OUTPUT BUFFER</b><pre>\n",
-		    Tcl_GetStringFromObj(outbuf, (int *)NULL));  */
+    {
+        print_headers(global_rr);
+        flush_output_buffer(global_rr);
+        if (dsc->dtcl_error_script)
+        {
+	    if (Tcl_EvalObj(interp, dsc->dtcl_error_script) == TCL_ERROR)
+                print_error(r, 1, "<b>Tcl_ErrorScript failed!</b>");
+        } else {
+            /* default action  */
+            errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
+            print_error(r, 0, errorinfo);
+            print_error(r, 1, "<p><b>OUTPUT BUFFER:</b></p>");
+            print_error(r, 0, Tcl_GetStringFromObj(outbuf, (int *)NULL));
+        }
+/*                  "</pre><b>OUTPUT BUFFER</b><pre>\n",
+                    Tcl_GetStringFromObj(outbuf, (int *)NULL));  */
     } else {
-	/* We make sure to flush the output if buffer_add was the only output */
-	print_headers(global_rr);
-	flush_output_buffer(global_rr);
+        /* We make sure to flush the output if buffer_add was the only output */
+        print_headers(global_rr);
+        flush_output_buffer(global_rr);
     }
     return OK;
 }
+
+
 
 /* Set things up to execute a file, then execute */
 
