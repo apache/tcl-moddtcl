@@ -599,11 +599,11 @@ static int send_content(request_rec *r)
     ApacheRequest___parse(globals->req);
 
     /* take results and create tcl variables from them */
-#if USE_ONLY_VAR_COMMAND == 1
-    if (req->parms)
+#if USE_ONLY_VAR_COMMAND == 0
+    if (globals->req->parms)
     {
 	int i;
-	array_header *parmsarray = ap_table_elts(req->parms);
+	array_header *parmsarray = ap_table_elts(globals->req->parms);
 	table_entry *parms = (table_entry *)parmsarray->elts;
 	Tcl_Obj *varsobj = Tcl_NewStringObj("::request::VARS", -1);
 	for (i = 0; i < parmsarray->nelts; ++i)
@@ -613,8 +613,8 @@ static int send_content(request_rec *r)
 	    else {
 		/* All this is so that a query like x=1&x=2&x=3 will
                    produce a variable that is a list */
-		Tcl_Obj *newkey = STRING_TO_UTF_TO_OBJ(parms[i].key);
-		Tcl_Obj *newval = STRING_TO_UTF_TO_OBJ(parms[i].val);
+		Tcl_Obj *newkey = STRING_TO_UTF_TO_OBJ(parms[i].key, r->pool);
+		Tcl_Obj *newval = STRING_TO_UTF_TO_OBJ(parms[i].val, r->pool);
 		Tcl_Obj *oldval = Tcl_ObjGetVar2(interp, varsobj, newkey, 0);
 
 		if (oldval == NULL)
