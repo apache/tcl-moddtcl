@@ -666,7 +666,7 @@ static int send_content(request_rec *r)
 	{
 	    if (upload->fp != NULL)
 	    {
-		chan = Tcl_MakeFileChannel((ClientData *)fileno(upload->fp), TCL_READABLE);
+		chan = Tcl_MakeFileChannel((ClientData)fileno(upload->fp), TCL_READABLE);
 		Tcl_RegisterChannel(interp, chan);
 		channelname = Tcl_GetChannelName(chan);
 		Tcl_ObjSetVar2(interp,

@@ -3,7 +3,7 @@
 
 Summary: Simple, fast Tcl server side scripting for Apache.
 Name: mod_dtcl
-Version: 0.10.1
+Version: 0.11.1
 Release: 1
 Copyright: Freely distributable and usable
 Group: System Environment/Daemons
@@ -23,7 +23,7 @@ scripting language, similar to PHP. It is fast, light, and lets you
 use the extensive codebase of existing Tcl code, on the web.
 
 %prep
-%setup -n %{name}-%{version}
+%setup -n %{name}
 sed -e 's/^INC=.*/INC=\/usr\/include\/apache/' \
     -e 's/^APACHE=.*/APACHE=\/usr\/sbin/' \
 	< builddtcl.sh > rpm-builddtcl.sh
@@ -45,6 +45,9 @@ install -c -s -m755 mod_dtcl.so $RPM_BUILD_ROOT%{_libdir}/apache/
 %{_libdir}/apache/mod_dtcl.so
 
 %changelog
+* Wed Aug  1 2001 Simon Greaves <Simon.Greaves@bigfoot.com>
+- mod_dtcl-0.11.1 packaged.
+
 * Wed May  2 2001 Simon Greaves <Simon.Greaves@bigfoot.com>
 - slight tweaks for mod_dtcl-0.10.1.
 

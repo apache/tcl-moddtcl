@@ -684,7 +684,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		{
 		    /* create and return a file channel */
 		    char *channelname = NULL;
-		    chan = Tcl_MakeFileChannel((ClientData *)fileno(
+		    chan = Tcl_MakeFileChannel((ClientData)fileno(
 			ApacheUpload_FILE(upload)), TCL_READABLE);
 		    Tcl_RegisterChannel(interp, chan);
 		    channelname = Tcl_GetChannelName(chan);
@@ -709,7 +709,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		else
 		    Tcl_SetChannelOption(interp, savechan, "-translation", "binary");
 
-		chan = Tcl_MakeFileChannel((ClientData *)fileno(
+		chan = Tcl_MakeFileChannel((ClientData)fileno(
 		    ApacheUpload_FILE(upload)), TCL_READABLE);
 		Tcl_SetChannelOption(interp, chan, "-translation", "binary");
 
@@ -736,7 +736,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		    Tcl_Channel chan = NULL;
 
 		    bytes = Tcl_Alloc(ApacheUpload_size(upload));
-		    chan = Tcl_MakeFileChannel((ClientData *)fileno(
+		    chan = Tcl_MakeFileChannel((ClientData)fileno(
 			ApacheUpload_FILE(upload)), TCL_READABLE);
 		    Tcl_SetChannelOption(interp, chan, "-translation", "binary");
 		    Tcl_SetChannelOption(interp, chan, "-encoding", "binary");
