@@ -1,3 +1,14 @@
+libapache-mod-dtcl (0.9.3-3) unstable; urgency=low
+
+  * Upgraded apreq* stuff to deal with file uploads directly to apache
+    variable.
+  
+  * UPLOAD variables can now be lists.
+  
+  * Switched syntax to <? ?>.
+
+ -- David N. Welton <davidw@debian.org>  Tue, 20 Mar 2001 20:17:29 +0100
+
 libapache-mod-dtcl (0.9.3-2) unstable; urgency=low
 
   * Added build depends.

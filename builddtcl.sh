@@ -79,4 +79,3 @@ BUILDDTCL="YES" ; export BUILDDTCL
 
 # pass the first argument to make
 make -e $1
-
