@@ -1,0 +1,140 @@
+
+mod_dtcl Documentation
+
+  1) Installation
+  
+    1. Check dependencies
+       To install mod_dtcl, you will need Tcl 8.2 or greater and Apache
+       1.3.xx. It is known to run on Linux, FreeBSD, OpenBSD, and
+       Solaris. NT is also possible - please see the directions in the
+       distribution.
+    2. Get mod_dtcl
+       If you are running a Debian or FreeBSD system, there are pre-built
+       packages available at:
+       [1]http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.
+       html or [2]http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1.
+       Otherwise, download the sources at FIXME.
+    3. Uncompress the sources
+       Sources should go in src/modules/mod_dtcl/, in your Apache source
+       directory.
+    4. Configure and Make
+       Run ./configure --add-module=src/modules/mod_dtcl/mod_dtcl.c from
+       the top level of your Apache source distribution. Then run make to
+       build the new Apache. This results in a static httpd with mod_dtcl
+       built in. It's also possible to build mod_dtcl as a DSO (dynamic
+       shared object) by editing mod_dtcl.c and the Makefile to point to
+       the right directories, and simply running make.
+    5. Configure Apache
+          + http.conf
+            LoadModule dtcl_module /usr/lib/apache/1.3/mod_dtcl.so
+            This points Apache to the shared object if mod_dtcl is being
+            used as a loadable module.
+          + srm.conf
+            AddType application/x-httpd-tcl .ttml
+            AddType application/x-dtcl-tcl .tcl (optional)
+            These add the .ttml and .tcl (if desired) types to Apache, so
+            that they are processed by mod_dtcl.
+       
+  2) Apache Directives
+  
+     * Dtcl_Script GlobalInitScript "script"
+       Tcl script that is run when each interpreter is initialized.
+       "script" is actual Tcl script, so to run a file, you would do
+       Dtcl_Script GlobalInitScript "source /var/www/foobar.tcl".
+     * Dtcl_Script ChildInitScript "script"
+       Script to be evaluated when each apache child is initialized. This
+       is the best place to load modules.
+     * Dtcl_Script ChildExitScript "script"
+       Script to be evaluated when each apache child exits.
+     * Dtcl_Script BeforeScript "script"
+       Script to be evaluated before each .ttml page. Note that you
+       cannot use hputs in the BeforeScript, but must instead use
+       buffer_add.
+     * Dtcl_Script AfterScript "script"
+       Script to be called after each .ttml page.
+     * Dtcl_CacheSize cachesize
+       Number of ttml scripts to cache as Tcl Objects. Default is
+       MaxRequestsPerChild / 2, or 50, if MaxRequestsPerChild is 0.
+       
+  3) mod_dtcl specific Tcl commands
+  
+     * buffer_add string
+       Add text to output_buffer for later printing. Used internally.
+     * hputs ?-error? text
+       The mod_dtcl version of "puts". Outputs to the client, instead of
+       to stdout. The error option permits you to send an 'error message'
+       to the apache log file, at the NOTICE level.
+     * hgetvars
+       Get environmental, CGI and Cookie variables. This is in a seperate
+       command so as not to make the server do this every time you load a
+       .ttml file. ENVS, VARS, and COOKIES are the associative arrays
+       created. ENVS contains environmental variables, VARS contains all
+       the 'cgi' variables, and COOKIES, any cookies recieved from the
+       client.
+     * include filename
+       Include a file without parsing it. This is the best way to include
+       an HTML file or any other static content.
+     * parse filename
+       "Source" a .ttml file. This is the way to include other .ttml
+       files.
+     * hflush
+       Flush the output buffers to the client. Use this if you want to
+       incrementally update a page.
+     * headers redirect uri
+       Redirect from the current page to a new URI. Must be done in the
+       first block of TCL code.
+     * headers setcookie cookie-name cookie-value ?-expires date/time?
+       ?-domain domain? ?-path path? ?-secure?
+       This command is for setting cookies. Cookie-name is the name of
+       the cookie, cookie-value is the data associated with the variable.
+       Expires sets an expiration date for the cookie, and must be in the
+       format 'DD-Mon-YY HH:MM:SS', path sets the path for which the
+       cookie is valid, and secure specifies that the cookie is only to
+       be transmitted if the connection is secure (HTTPS).
+     * headers type content-type
+       This command sets the "Content-type:" header returned by the
+       script, which is useful if you wish to create a PNG (image), for
+       example, with mod_dtcl.
+     * headers set headername value
+       Set arbitrary header names and values.
+     * dtcl_info
+       Prints information on the internals of the module in HTML.
+       Currently, only the PID and size of the object cache are reported.
+       
+  4) Internals
+  
+     * Read the code!
+     * Initialization
+       When Apache is started, (or when child Apache processes are
+       started if a threaded Tcl is used), tcl_init_stuff is called,
+       which creates a new interpreter, and initializes various things,
+       like the apache_channel channel system. The caching system is also
+       set up, and if there is a GlobalScript, it is run.
+     * Achan/apache_channel
+       The "Apache Channel" system was created so that it is possible to
+       have an actual Tcl channel that we could redirect standard output
+       to. This lets us use, for instance, the regular "puts" command in
+       .ttml pages. It works by creating commands that write to memory
+       that is slated to be sent to the client.
+     * Page parsing/execution
+       In send_parsed_file Each .ttml file is loaded and run within its
+       own namespace. No new interpreter is created for each page. This
+       lets you share variables, and most importantly, loaded modules,
+       from a common parent (such as one of the InitScripts). When a file
+       is loaded, it is transformed into a Tcl script by putting
+       everything outside of <+ and +> into large hputs statements. When
+       the script is complete, it is then inserted into the cache, for
+       future use. In fact, if the file modification information doesn't
+       change, mod_dtcl will execute the cached version of the script the
+       next time it is encountered.
+     * Binary data
+       mod_dtcl is capable of outputing binary data, such as images, or
+       loading binary data with 'include'.
+       
+                           [3]Powered by Apache 
+
+References
+
+   1. http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html
+   2. http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1
+   3. http://www.apache.org/

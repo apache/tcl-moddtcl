@@ -168,6 +168,14 @@ static int cacheSize = 0;               /* size of cache, determined
                                            dtcl_init_handler function */
 static int cacheFreeSize = 0;           /* free space in cache */
 
+typedef struct {
+    Tcl_Obj *dtcl_global_init_script;
+    Tcl_Obj *dtcl_child_init_script;
+    Tcl_Obj *dtcl_child_exit_script;
+    Tcl_Obj *dtcl_before_script;
+    Tcl_Obj *dtcl_after_script;
+    int dtcl_cache_size;
+} dtcl_server_conf;
 
 /* Functions for Tcl Channel */
 /*
@@ -1034,7 +1042,9 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
     if (isNew || !cacheSize) {
 	/* BEGIN PARSER  */
 	char inside = 0;	/* are we inside the starting/ending delimiters  */
-
+	
+	dtcl_server_conf *dsc = NULL;
+	void *sconf = r->server->module_config;
 	const char *strstart = STARTING_SEQUENCE;
 	const char *strend = ENDING_SEQUENCE;
 
@@ -1044,6 +1054,7 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
 
 	FILE *f = NULL;
 
+	dsc = (dtcl_server_conf *) ap_get_module_config(sconf, &dtcl_module);
 	if (!(f = ap_pfopen(r->pool, filename, "r")))
 	{
 	    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
@@ -1053,7 +1064,12 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
 
 	/* Beginning of the file parser */
 	if (toplevel)
-	    outbuf = Tcl_NewStringObj("namespace eval request { buffer_add \"", -1);
+	{
+	    outbuf = Tcl_NewStringObj("namespace eval request {\n", -1);
+	    if (dsc->dtcl_before_script)
+		Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
+	    Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
+	}
 	else
 	    outbuf = Tcl_NewStringObj("hputs \"\n", -1);
 
@@ -1139,11 +1155,16 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
 
 	if (!inside)
 	{
-	    Tcl_AppendToObj(outbuf, "\"", 1);
+	    Tcl_AppendToObj(outbuf, "\"\n", 2);
 	}
-
+	
 	if (toplevel)
+	{
+	    if (dsc->dtcl_after_script)
+		Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
+	    
 	    Tcl_AppendToObj(outbuf, "\n}\nnamespace delete request\n", -1);
+	}
 	else
 	    Tcl_AppendToObj(outbuf, "\n", -1);
 
@@ -1314,15 +1335,6 @@ static int send_content(request_rec *r)
     return OK;
 }
 
-typedef struct {
-    Tcl_Obj *dtcl_global_init_script;
-    Tcl_Obj *dtcl_child_init_script;
-    Tcl_Obj *dtcl_child_exit_script;
-    Tcl_Obj *dtcl_before_script;
-    Tcl_Obj *dtcl_after_script;
-    int dtcl_cache_size;
-} dtcl_server_conf;
-
 static void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
@@ -1427,6 +1439,7 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
     }
     
     objarg = Tcl_NewStringObj(arg2, -1);
+    Tcl_AppendToObj(objarg, "\n", 1);
     if (strcmp(arg, "GlobalInitScript") == 0) {
 	conf->dtcl_global_init_script = objarg;
     } else if (strcmp(arg, "ChildInitScript") == 0) {
@@ -1495,7 +1508,7 @@ static void dtcl_child_exit(server_rec *s, pool *p)
 static const handler_rec dtcl_handlers[] =
 {
     {"application/x-httpd-tcl", send_content},
-    {"text/x-tcl", send_content},
+    {"application/x-dtcl-tcl", send_content},
     {NULL}
 };
 

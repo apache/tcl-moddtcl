@@ -1,3 +1,11 @@
+libapache-mod-dtcl (0.8.8-2) unstable; urgency=low
+
+  * Code to deal with before/after scripts.
+  
+  * Rewrite of Apache directives.
+
+ -- David N. Welton <davidw@linuxcare.com>  Tue, 26 Sep 2000 17:59:57 +0200
+
 libapache-mod-dtcl (0.8.1-1) unstable; urgency=low
 
   * Put some code in as a workaround for systems with Tcl compiled against

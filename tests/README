@@ -1,0 +1,20 @@
+Test Suite for mod_dtcl
+
+$Id$
+
+These tests are intended to automate the testing of core mod_dtcl
+features.  They are not complete at this point, and work on them would
+be welcome.
+
+How to run the tests:
+
+Assuming you have a system which runs mod_dtcl, put the dtcl-test.ttml
+file somewhere under your document root, and modify this line:
+
+set urlbase "http://eugene.i.linuxcare.it/~davidw/tests/"
+
+to something like
+
+set urlbase "http://path.to.testfile.com/mytests/"
+
+Then run dtcl.test, and look and see if any of the tests fail.

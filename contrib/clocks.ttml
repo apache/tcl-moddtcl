@@ -1,7 +1,7 @@
 <table>
 <+
 # Creates a table that displays the times in various locations in the
-# world
+# world - davidw
 
 headers set Refresh 60
 

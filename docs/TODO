@@ -6,6 +6,8 @@ To do:
 * Script timeouts: set limits on the length of time a script will run
   before it returns or dies.
 
+* General resource limits?
+
 * More commands available for scripters (see PHP for examples).
 
 * File uploads.  This is tricky, but necessary.
@@ -15,8 +17,6 @@ To do:
 * Further internationalization (multibyte languages such as Japanese).
 
 * Nicer logo - artists welcome!
-
-* Automated test suite - Dtcl pages + Tcl scripts which test them.
 
 Random ideas and thoughts about the future:
 
