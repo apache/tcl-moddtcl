@@ -18,7 +18,7 @@ OBJECTS=mod_dtcl.o tcl_commands.o $(APREQ_OBJECTS)
 
 # The following TCL_* variables are all exported from builddtcl.sh
 
-COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNING) $(TCL_SHLIB_CFLAGS) -c $(INC) $(CFLAGS) $(TCL_EXTRA_CFLAGS) $<
+COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNING) $(TCL_SHLIB_CFLAGS) -c $(INC) $(CFLAGS) $(TCL_EXTRA_CFLAGS) $(EXTRA_FLAGS) $<
 
 all: builddtcl_test shared
 

@@ -10,6 +10,13 @@ exec tclsh "$0" "$@"
 set buffer ""
 
 proc dtcl_info { } {
+puts "<table border=0 bgcolor=green><tr><td>\n
+<table border=0 bgcolor=\"#000000\">\n
+<tr><td align=center bgcolor=blue><font color=\"#ffffff\" size=+2>dtcl_info</font><br></td></tr>\n
+<tr><td><font color=\"#ffffff\">Free cache size: XXX</font><br></td></tr>\n
+<tr><td><font color=\"#ffffff\">PID: [pid]</font><br></td></tr>\n
+</table>\n
+</td></tr></table>\n"
 }
 
 proc buffered { x } {
@@ -38,6 +45,21 @@ proc no_body { } {
 proc hgetvars { } {
     array set ENVS {x y}
     array set VARS {a b}
+}
+
+proc var { command args } {
+    switch command {
+	get {
+	}
+	list {
+	}
+	exists {
+	}
+	names {
+	}
+	number {
+	}
+    }
 }
 
 proc buffer_add { x } {
