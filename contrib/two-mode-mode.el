@@ -18,55 +18,69 @@
 ;; part of Debian GNU/Linux.
 
 ;; configure these:
-(defvar two-mode-lmatch "<+")
-(defvar two-mode-rmatch "+>")
+(defvar two-mode-lmatch "<?")
+(defvar two-mode-rmatch "?>")
 
-(defvar default-mode (list 'sgml-mode "SGML"))  ;; outside the above tokens
+(defvar two-mode-update 0)
+(defvar two-mode-mode-idle-timer nil)
+(defvar two-mode-bool nil)
+(defvar default-mode (list 'html-mode "HTML"))  ;; outside the above tokens
 (defvar second-mode (list 'tcl-mode "TCL"))     ;; inside
+(defvar two-mode-mode-delay (/ (float 1) (float 8)))
 ;; ----------------
 
 (defun two-mode-mode-setup ()
   (make-local-hook 'post-command-hook)
-  (add-hook 'post-command-hook 'two-mode-mode-update-mode nil t)
+  (add-hook 'post-command-hook 'two-mode-mode-need-update nil t)
   (make-local-variable 'minor-mode-alist)
-  (or (assq 'two-mode-mode minor-mode-alist)
+  (make-local-variable 'two-mode-bool)
+  (setq two-mode-bool t)
+  (when two-mode-mode-idle-timer
+    (cancel-timer two-mode-mode-idle-timer))
+  (setq two-mode-mode-idle-timer (run-with-idle-timer two-mode-mode-delay t 'two-mode-mode-update-mode))
+  (or (assq 'two-mode-bool minor-mode-alist)
       (setq minor-mode-alist
-	    (cons '(two-mode-mode " two-mode") minor-mode-alist))))
+	    (cons '(two-mode-bool " two-mode") minor-mode-alist))))
+
+(defun two-mode-mode-need-update ()
+  (setq two-mode-update 1))
 
 (defun two-mode-change-mode (to-mode)
   (if (string= to-mode mode-name)
       t
     (progn 
-      (if (string= to-mode (cadr second-mode))
-	  (save-excursion 
-	    (funcall (car second-mode)))
-	(save-excursion
-	  (funcall (car default-mode))))
+      (save-excursion
+	(if (string= to-mode (cadr second-mode))
+	    (funcall (car second-mode))
+	(funcall (car default-mode))))
       (two-mode-mode-setup)
-      (if (eq font-lock-mode t)          
-	  (font-lock-fontify-buffer)))))
+      (if (eq font-lock-mode t)
+	  (font-lock-fontify-buffer))
+      (turn-on-font-lock-if-enabled))))
 
 (defun two-mode-mode-update-mode ()
-  (let ((lm -1)
-	(rm -1))
-    (save-excursion 
-      (if (search-backward two-mode-lmatch nil t)
-	  (setq lm (point))
-	(setq lm -1)))
-    (save-excursion
-      (if (search-backward two-mode-rmatch nil t)
-	  (setq rm (point))
-	(setq rm -1)))
-    (if (and (= lm -1) (= rm -1))
-	(two-mode-change-mode (cadr default-mode))
-      (if (>= lm rm)
-	  (two-mode-change-mode (cadr second-mode))
-	(two-mode-change-mode (cadr default-mode))))))
+  (when (and two-mode-bool two-mode-update)
+    (setq two-mode-update 0)
+    (let ((lm -1)
+	  (rm -1))
+      (save-excursion 
+	(if (search-backward two-mode-lmatch nil t)
+	    (setq lm (point))
+	  (setq lm -1)))
+      (save-excursion
+	(if (search-backward two-mode-rmatch nil t)
+	    (setq rm (point))
+	  (setq rm -1)))
+      (if (and (= lm -1) (= rm -1))
+	  (two-mode-change-mode (cadr default-mode))
+	(if (>= lm rm)
+	    (two-mode-change-mode (cadr second-mode))
+	  (two-mode-change-mode (cadr default-mode)))))))
 
 (defun two-mode-mode ()
+  "Turn on two-mode-mode"
   (interactive)
   (funcall (car default-mode))
-  (setq two-mode-mode t)
   (two-mode-mode-setup))
 
 (provide 'two-mode-mode)
