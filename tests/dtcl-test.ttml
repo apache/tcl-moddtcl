@@ -1,8 +1,11 @@
 <?
+# $Id$
+# dtcl page used with mod_dtcl's dtcl.test
+# place in DocumentRoot of http://localhost/
 
 hgetvars
 
-headers setcookie mod dtcl -expires 01-01-2003 
+headers setcookie -name mod -value dtcl -expires 01-01-2003 
 
 # hello-1.1
 hputs "Hello, World\n"

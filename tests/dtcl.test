@@ -7,7 +7,7 @@
 package require tcltest
 package require http 2.1
 
-set urlbase "http://eugene.i.prosa.it/~davidw/tests/"
+set urlbase "http://localhost/"
 set testfilename "dtcl-test.ttml"
 
 ::tcltest::test hello-1.1 {hello world test} {
