@@ -2,6 +2,7 @@
 # makefile for mod_dtcl and MingW32
 # 
 # 
+#
 
 #
 # I use this as a pointer to a good temporary location. 
@@ -40,7 +41,6 @@ APACHE_SRC = ..\\apache
 APACHE_INC = -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
 
 
-
 #
 # Set APACHE_LIB and APACHE_DEF to where you'd like a MingW32 compatible
 # APACHE library file and DLL DEF file put.  You normally only need these
@@ -48,6 +48,13 @@ APACHE_INC = -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
 #
 APACHE_LIB = $(TEMP_LIBS) 
 APACHE_DEF = $(TEMP_LIBS)\\ApacheCore.def
+
+# 
+# Set APACHE_STYLE to "OLD" for versions before 1.3.17, or "NEW" for the newer
+# versions of Apache (i.e. 1.3.17 or newer).  Some file locations changed
+# between versions and this affects the build process
+APACHE_STYLE = OLD
+#APACHE_STYLE = NEW
 
 
 #
@@ -75,12 +82,18 @@ DLLWRAP_FLAGS = --def $(DLL_EXP_DEF) \
 	--implib $(DLL_EXP_LIB) \
 	--driver-name $(CC)
 
+ifeq ($(APACHE_STYLE),OLD)
+ DLL_BUILD=$(DLL_DYNAMIC)
+ APACHE_EXP=$(APACHE_SRC)\\src\\CoreR\\ApacheCore.exp
+else
+ DLL_BUILD=$(DLL_SO)
+ APACHE_EXP=$(APACHE_SRC)\\src\\Release\\ApacheCore.exp
+endif
+
 #
 # By default we build a .dll file (Apache < 1.3.14)
 #
-# FOR (Apache >= 1.3.17)
-#all : apache_libs $(DLL_SO)
-all : apache_libs $(DLL_DYNAMIC)
+all : apache_libs $(DLL_BUILD)
 
 dll_style: apache_libs $(DLL_DYNAMIC)
 
@@ -116,20 +129,15 @@ channel.o: $(ROOT_DIR)channel.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)channel.h
 clean:
 	-@rm -f $(DLL_OBJS) $(DLL_DYNAMIC) $(DLL_SO) $(DLL_EXP_LIB)
 
-# FOR (Apache >= 1.3.17)
-#install: $(DLL_SO)
-#	echo Installing mod_dtcl...
-#	-cp $(DLL_SO) $(APACHE_HOME)\\modules
-
-install: $(DLL_DYNAMIC) $(DLL_EXP_LIB)
+install: $(DLL_BUILD) $(DLL_EXP_LIB)
 	echo Installing mod_dtcl...
-	-cp $(DLL_DYNAMIC) $(APACHE_HOME)\\modules
+	-cp $(DLL_BUILD) $(APACHE_HOME)\\modules
 
 apache_libs:
 	-@mkdir $(TEMP_LIBS)
 	-@rm $(APACHE_DEF)
 	echo EXPORTS > $(APACHE_DEF)
-	nm $(APACHE_SRC)\\src\\CoreR\\ApacheCore.exp |grep " U _" | sed "s/.* U _//" >> $(APACHE_DEF)
+	nm $(APACHE_EXP) |grep " U _" | sed "s/.* U _//" >> $(APACHE_DEF)
 	sed -e "s/ap_log_error$$/ap_log_error@0/g" \
 		-e "s/ap_log_rerror$$/ap_log_rerror@0/g" \
 		-e "s/ap_table_do$$/ap_table_do@0/g" \
