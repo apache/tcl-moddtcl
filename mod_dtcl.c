@@ -732,7 +732,7 @@ int send_content(request_rec *r)
     }
    upload = req->upload;
 
-//    while (upload)
+/* while (upload)  */
     if (upload)
     {
 	char *type = NULL;
@@ -778,7 +778,7 @@ int send_content(request_rec *r)
 			   0);
 	}
 	
-//	upload = upload->next;
+	/* upload = upload->next;  */
     }
 
     if(!strcmp(r->content_type, "application/x-httpd-tcl"))

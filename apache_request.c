@@ -203,8 +203,8 @@ ApacheRequest *ApacheRequest_new(request_rec *r)
     req->upload = NULL;
     req->post_max = -1;
     req->disable_uploads = 0;
-//    req->ApacheUploadHook = NULL;
-//    req->hookptr = NULL;
+    req->ApacheUploadHook = NULL;
+    req->hookptr = NULL;
     req->parsed = 0;
     req->r = r;
 

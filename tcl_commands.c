@@ -255,7 +255,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	else
 	    return TCL_ERROR;
     } else {
-	// XXX	Tcl_WrongNumArgs(interp, 1, objv, "headers option arg ?arg ...?");
+	/* XXX	Tcl_WrongNumArgs(interp, 1, objv, "headers option arg ?arg ...?");  */
 	return TCL_ERROR;
     }
     return TCL_OK;
