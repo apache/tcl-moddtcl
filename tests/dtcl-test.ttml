@@ -2,6 +2,8 @@
 
 hgetvars
 
+headers setcookie mod dtcl -expires 01-01-2003 
+
 # hello-1.1
 hputs "Hello, World\n"
 

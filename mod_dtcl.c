@@ -72,17 +72,6 @@
  *
  */
 
-/* This is an Apache hack to get the module to compile against libtcl. */
-
-/*
- * MODULE-DEFINITION-START
- * Name: dtcl_module
- * ConfigStart
-    LIBS="$LIBS -ltcl -ldl"
- * ConfigEnd
- * MODULE-DEFINITION-END
- */
-
 #include "httpd.h"
 #include "http_config.h"
 #include "http_request.h"
@@ -128,7 +117,7 @@
 #define DEFAULT_ERROR_MSG "[an error occurred while processing this directive]"
 #define DEFAULT_TIME_FORMAT "%A, %d-%b-%Y %H:%M:%S %Z"
 #define DEFAULT_HEADER_TYPE "text/html"
-/* #define DTCL_VERSION "0.8.5"  */
+/* #define DTCL_VERSION "X.X.X" */
 
 /* *** Global variables *** */
 static Tcl_Interp *interp;              /* Tcl interpreter */
@@ -623,6 +612,7 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 
     if (!strcmp("setcookie", opt)) /* ### setcookie ### */
     {
+	char *val;
 	char *cookie;
 	int i, idx;
 	static char* cookieParms[] = {
@@ -635,18 +625,14 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 	if (objc < 4 || objc > 10)
 	{
 	    Tcl_WrongNumArgs(interp, 1, objv,
-			     "setcookie cookie-name cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure?");
+			     "headers setcookie cookie-name cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure?");
 	    return TCL_ERROR;
 	}
 
 	/* SetCookie: foo=bar; EXPIRES=DD-Mon-YY HH:MM:SS; DOMAIN=domain; PATH=path; SECURE */
-	if (*(Tcl_GetStringFromObj(objv[3], NULL)))
-	{
-	    cookie = ap_pstrcat(global_rr->pool, cgiEncodeObj(objv[2]), "=",
-                          cgiEncodeObj(objv[3]), NULL);
-	} else {
-	    cookie = cgiEncodeObj(objv[2]);
-	}
+
+	val = Tcl_GetString(objv[3]);
+	cookie = ap_pstrcat(global_rr->pool, cgiEncodeObj(objv[2]), "=", cgiEncodeObj(objv[3]), NULL);
 
 	for (i = 4; i < objc; i++)
 	{
@@ -657,7 +643,7 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 		cookie = ap_pstrcat(global_rr->pool, cookie, cookieStrings[idx], NULL);
 	    } else if (++i >= objc) {
 		Tcl_WrongNumArgs(interp, 1, objv,
-				 "setcookie cookie-name cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure?");
+				 "headers setcookie cookie-name cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure?");
 		return TCL_ERROR;
 	    } else {
 		cookie = ap_pstrcat(global_rr->pool, cookie, cookieStrings[idx],
@@ -819,7 +805,6 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
 
 	    while(var)
 	    {
-		val = strchr(var, '=');
 		var2 = strchr(var, ';');
 		if (var2 != NULL)
 		{
@@ -827,13 +812,18 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
 		    if ((*var2 == ' ') && (*var2 != '\0'))
 			var2++;
 		}
-
+		val = strchr(var, '=');
+		
 		if (val)
 		{
+		    char *discard = NULL; 
+		    discard = strchr(val, ' ');
+		    if (discard)
+			*discard = '\0';
 		    *val++ = '\0';
 		    var = cgiDecodeString(var);
 		    val = cgiDecodeString(val);
-		}
+		} 
 		Tcl_SetVar2(interp, "::request::COOKIES", cgiDecodeString(var), val, 0);
 		var = var2;
 	    }
@@ -1549,3 +1539,9 @@ module MODULE_VAR_EXPORT dtcl_module =
     dtcl_child_exit,            /* child_exit */
     NULL			/* post read-request */
 };
+
+/*
+Local Variables: ***
+compile-command: "./builddtcl.sh" ***
+End: ***
+*/

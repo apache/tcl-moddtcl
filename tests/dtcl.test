@@ -70,4 +70,24 @@ set testfilename "dtcl-test.ttml"
     regexp -line {^COOKIES\(Más\) = Tú$} [ ::http::data $page ]
 } 1
 
-puts "Done"
+::tcltest::test cookies-1.4 {Multiple Cookies} {
+    set rslt 0
+    set page [ ::http::geturl "${urlbase}$testfilename" -headers {Cookie "bop; foo=bar;doo=wah; shoo=be ;doooo=bee;dot=dow  "} ]
+    set pgdata [ ::http::data $page ]
+    incr rslt [ regexp -line {^COOKIES\(foo\) = bar$} $pgdata ]
+    incr rslt [ regexp -line {^COOKIES\(doo\) = wah} $pgdata ]
+    incr rslt [ regexp -line {^COOKIES\(shoo\) = be} $pgdata ]
+    incr rslt [ regexp -line {^COOKIES\(doooo\) = bee} $pgdata ]
+    incr rslt [ regexp -line {^COOKIES\(dot\) = dow$} $pgdata ]
+    incr rslt [ regexp -line {^COOKIES\(bop\) = } $pgdata ]
+} 6
+
+::tcltest::test servercookies-1.1 {Cookies from Server} {
+    set rslt 0
+    set page [ ::http::geturl "${urlbase}$testfilename" ]
+    upvar 0 $page state
+    array set statehash $state(meta)
+    regexp -line {mod=dtcl; expires=01-01-2003} $statehash(Set-Cookie)
+} 1
+
+::tcltest::cleanupTests

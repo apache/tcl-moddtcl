@@ -1,43 +1,60 @@
 # $Id$
 
-## This originally was from the apache module makefile thing You may
-## have to diddle with this yourself, unless you use the built in
-## Apache config tools
+# Changed to use the Tcl variables from tclConfig.sh
 
-# If you link against Tcl like so: "-ltcl", leave this blank.
-TCL_VERSION=8.2
+# You may have to change these if 'builddtcl.sh' and 'findconfig.tcl'
+# don't work.
 
-OPTIM=-O3
-CC=gcc
-CFLAGS_SHLIB=-fpic -DSHARED_MODULE
+TCL_LIB=$(TCL_LIB_FLAG)
+OPTIM=$(TCL_CFLAGS_OPTIMIZE)
+CC=$(TCL_CC)
+CFLAGS_SHLIB=$(TCL_SHLIB_CFLAGS) -DSHARED_MODULE
 LDFLAGS_SHLIB=-Bshareable
-CFLAGS1= -Wall -DLINUX=2 -DSTATUS -DNO_DBM_REWRITEMAP -DUSE_HSREGEX -fpic -DSHARED_CORE
 
-CFLAGS=$(OPTIM) $(CFLAGS1) $(EXTRA_CFLAGS)
+DEBUG=-g
+CFLAGS=-Wall $(OPTIM) $(EXTRA_CFLAGS)
 # You must change the following line unless you have the Debian apache-dev package
 INCLUDES=-I/usr/include/apache-1.3/
-LDFLAGS=$(LDFLAGS1) $(EXTRA_LDFLAGS)
 INCDIR=$(SRCDIR)/include
-SHLIBS= mod_dtcl.so
-SHLIBS_OBJ= mod_dtcl-so.o
+STATICLIB=mod_dtcl.a
+SHLIB=mod_dtcl.so
 
-all: lib shlib
+all: builddtcl_test lib shlib
 
-lib:	$(LIB)
+static: lib
+lib: $(STATICLIB)
 
-shlib:	$(SHLIBS)
+.c.a:
+	$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) -DDTCL_VERSION=\"`cat VERSION`\" $<
+	ar cr $(STATICLIB) $*.o
 
-.SUFFIXES: .so
+shared: shlib
+shlib: $(SHLIB)
+
+.SUFFIXES: .so .a
 
 .c.so:
-	$(CC) -g -c $(INCLUDES) $(CFLAGS) $(CFLAGS_SHLIB) $(SPACER) -DDTCL_VERSION=\"`cat VERSION`\" $< && mv $*.o $*-so.o
-	$(LD) $(LDFLAGS_SHLIB) -o $@ $*-so.o -ltcl$(TCL_VERSION)
+	$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) $(CFLAGS_SHLIB) -DDTCL_VERSION=\"`cat VERSION`\" $< && mv $*.o $*-so.o
+	$(LD) $(LDFLAGS_SHLIB) -o $@ $*-so.o $(TCL_LIB)
 
 clean: 
-	rm -f $(SHLIBS) $(SHLIBS_OBJ) $(LIB) $(SHLIB)
+	-rm -f $(STATICLIB) $(SHLIB) *.o *~
 
 version: 
 	./cvsversion.tcl
 
-dist: clean version all
+dist: clean version
 	(cd .. ; tar -czvf mod_dtcl-`cat mod_dtcl/VERSION`.tar.gz mod_dtcl/ ; )
+
+install: lib
+	-mkdir $(APACHE)src/modules/mod_dtcl/
+	cp $(STATICLIB) $(APACHE)src/modules/mod_dtcl/
+	cp Makefile.dummy $(APACHE)src/modules/mod_dtcl/Makefile
+
+
+# This forces mod_dtcl to be built with the shell script, so please
+# comment it out if you need to.
+
+.SILENT: builddtcl_test
+builddtcl_test:
+	if [ "$(BUILDDTCL)" != "YES" ] ; then echo "You should use builddtcl.sh to build mod_dtcl"; exit 1 ; fi

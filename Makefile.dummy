@@ -1,0 +1,4 @@
+# Dummy makefile for static Apache builds.
+
+all:
+	echo "Mod_dtcl added to Apache"
