@@ -439,8 +439,10 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 		char *name = c->name;
 		char *value = ApacheCookieFetch(c, j);
 		Tcl_ObjSetVar2(interp, cookieobj,
-			       STRING_TO_UTF_TO_OBJ(name, POOL),
-			       STRING_TO_UTF_TO_OBJ(value, POOL), 0);
+			       Tcl_NewStringObj(name, -1),
+			       Tcl_NewStringObj(value, -1), 0);
+/* 			       STRING_TO_UTF_TO_OBJ(name, POOL),
+			       STRING_TO_UTF_TO_OBJ(value, POOL), 0);  */
 	    }
 
 	}

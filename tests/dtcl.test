@@ -1,4 +1,6 @@
-#!/usr/bin/tclsh
+#!/bin/sh
+# the next line restarts using tclsh \
+exec tclsh "$0" "$@"
 
 # mod_dtcl test suite, by David N. Welton <davidw@apache.org>
 
@@ -7,7 +9,7 @@
 package require tcltest
 package require http 2.1
 
-set urlbase "http://localhost/"
+set urlbase "http://localhost:8080/"
 set testfilename "dtcl-test2.ttml"
 
 ::tcltest::test hello-1.1 {hello world test} {

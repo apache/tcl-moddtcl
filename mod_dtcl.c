@@ -331,9 +331,7 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 	goto error;
     }
 
-    cmdBuffer = (char *) malloc(r->finfo.st_size + 1);
-
-    result = Tcl_Read(chan, cmdBuffer, r->finfo.st_size);
+    result = Tcl_ReadChars(chan, outbuf, r->finfo.st_size, 1);
     if (result < 0)
     {
 	Tcl_Close(interp, chan);
@@ -341,13 +339,9 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 			 "\": ", Tcl_PosixError(interp), (char *) NULL);
 	goto error;
     }
-    cmdBuffer[result] = 0;
 
     if (Tcl_Close(interp, chan) != TCL_OK)
 	goto error;
-
-    Tcl_SetStringObj(outbuf, cmdBuffer, strlen(cmdBuffer));
-    free(cmdBuffer);
 
     /* yuck  */
     goto end;
@@ -967,10 +961,6 @@ static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf
     newdsc->objCache = olddsc->objCache;
     newdsc->namespacePrologue = olddsc->namespacePrologue;
 
-    newdsc->buffer_output = olddsc->buffer_output;
-    newdsc->headers_printed = olddsc->headers_printed;
-    newdsc->headers_set = olddsc->headers_set;
-    newdsc->content_sent = olddsc->content_sent;
     newdsc->buffer_output = olddsc->buffer_output;
     newdsc->headers_printed = olddsc->headers_printed;
     newdsc->headers_set = olddsc->headers_set;

@@ -8,13 +8,11 @@ be welcome.
 
 How to run the tests:
 
-Assuming you have a system which runs mod_dtcl, put the dtcl-test.ttml
-file somewhere under your document root, and modify this line:
+The program 'runtest.tcl' is launched with the full path to the apache
+web server.  It then creates a minimal config file in the directory it
+is launched from, and launches Apache with the generated config.  We
+are thusly able to manipulate the environment completely, and run the
+tests directly in the tests/ directory...
 
-set urlbase "http://localhost/"
+Note that mod_so.c must be compiled into Apache for this to work.
 
-to something like
-
-set urlbase "http://path.to.testfile.com/mytests/"
-
-Then run dtcl.test, and look and see if any of the tests fail.
