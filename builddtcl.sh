@@ -25,7 +25,7 @@ fi
 # comment this out for shared lib installs
 # APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-APACHE=/usr/local/src/apache-1.3/
+# APACHE=/usr/local/src/apache-1.3/
 # APACHE=/
 
 export APACHE

@@ -1,3 +1,11 @@
+libapache-mod-dtcl (0.11.3-1) unstable; urgency=low
+
+  * I18n updates.
+
+  * Fixed build scripts. (closes: #111488)
+
+ -- David N. Welton <davidw@debian.org>  Tue,  9 Oct 2001 17:22:37 +0200
+
 libapache-mod-dtcl (0.11.2-1) unstable; urgency=low
 
   * Minor updates.

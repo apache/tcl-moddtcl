@@ -9,7 +9,7 @@ package=libapache-mod-dtcl
 
 build:
 	$(checkdir)
-	( export C_INCLUDE_PATH=/usr/include/tcl$(TCL_VERSION)/ ; ./builddtcl.sh EXTRA_FLAGS=-DEAPI )
+	( export C_INCLUDE_PATH=/usr/include/tcl$(TCL_VERSION)/ ; APACHE=/ ./builddtcl.sh EXTRA_FLAGS=-DEAPI )
 	touch build
 
 clean:
