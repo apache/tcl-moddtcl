@@ -38,6 +38,10 @@
    'var' command. */
 #define USE_ONLY_VAR_COMMAND 0
 
+/* Turn off 'old-style' $UPLOAD variable, and use only the 'upload'
+   command.  */
+#define USE_ONLY_UPLOAD_COMMAND 0
+
 /* End Configuration options  */
 
 #define STARTING_SEQUENCE "<?"

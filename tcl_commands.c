@@ -16,6 +16,7 @@
 #include "apache_cookie.h"
 #include "mod_dtcl.h"
 
+#define BUFSZ 4096
 
 extern request_rec *global_rr;
 extern obuff obuffer;
@@ -23,6 +24,8 @@ extern int content_sent;
 extern int buffer_output;
 extern int headers_printed;
 extern int cacheFreeSize;
+extern int upload_files_to_var;
+extern Tcl_Obj *uploadstorage[];
 
 extern ApacheRequest *global_req;
 
@@ -63,7 +66,7 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 {
     Tcl_Channel fd;
     int sz;
-    char buf[2000];
+    char buf[BUFSZ];
 
     if (objc != 2)
     {
@@ -81,8 +84,8 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	Tcl_SetChannelOption(interp, fd, "-translation", "lf");
     }
 /*     print_headers(global_rr);
-    flush_output_buffer(global_rr);  */
-    while ((sz = Tcl_Read(fd, buf, sizeof(buf) - 1)))
+       flush_output_buffer(global_rr);  */
+    while ((sz = Tcl_Read(fd, buf, BUFSZ - 1)))
     {
 	if (sz == -1)
 	{
@@ -96,7 +99,7 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
            it, depending on buffering */
 	memwrite(&obuffer, buf, sz);
 
-	if (sz < sizeof(buf) - 1)
+	if (sz < BUFSZ - 1)
 	    break;
     }
     return Tcl_Close(interp,fd);
@@ -372,7 +375,7 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1), STRING_TO_UTF_TO_OBJ(ap_pstrdup(global_rr->pool, pw->pw_name)), 0);
     else
 	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1),
-		    STRING_TO_UTF_TO_OBJ(ap_psprintf(global_rr->pool, "user#%lu", (unsigned long) global_rr->finfo.st_uid)), 0);
+		       STRING_TO_UTF_TO_OBJ(ap_psprintf(global_rr->pool, "user#%lu", (unsigned long) global_rr->finfo.st_uid)), 0);
 #endif
 
     if ((t = strrchr(global_rr->filename, '/')))
@@ -454,7 +457,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 	Tcl_WrongNumArgs(interp, 1, objv, "(get varname|list varname|exists varname|names|number|all)");
 	return TCL_ERROR;
     }
-    command = Tcl_GetStringFromObj(objv[1], NULL);
+    command = Tcl_GetString(objv[1]);
 
     if (!strcmp(command, "get"))
     {
@@ -603,6 +606,175 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
     return TCL_OK;
 }
 
+/*
+upload get XYZ
+               channel        # returns channel
+	       save (name)    # returns name?
+	       data           # returns data
+
+with the third one reporting an error if this hasn't been enabled, or
+the first two if it has.
+
+upload info XYZ
+
+                exists
+                size
+                type
+                filename
+
+upload names
+
+gets all the upload names.
+*/
+
+int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+{
+    char *command = NULL;
+    Tcl_Obj *result = NULL;
+    ApacheUpload *upload;
+
+    if (objc < 2 || objc > 5)
+    {
+	Tcl_WrongNumArgs(interp, 1, objv, "get ...|info ...|names");
+	return TCL_ERROR;
+    }
+    command = Tcl_GetString(objv[1]);
+
+    if (!strcmp(command, "get"))
+    {
+	char *varname = NULL;
+	if (objc < 4)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, "varname channel|save filename|var varname");
+	    return TCL_ERROR;
+	}
+	varname = Tcl_GetString(objv[2]);
+	upload = ApacheUpload_find(global_req->upload, varname);
+	if (upload != NULL) /* make sure we have an upload */
+	{
+	    Tcl_Channel chan;
+	    char *method = Tcl_GetString(objv[3]);
+	    if (!strcmp(method, "channel"))
+	    {
+		if (ApacheUpload_FILE(upload) != NULL)
+		{
+		    /* create and return a file channel */
+		    char *channelname = NULL;
+		    chan = Tcl_MakeFileChannel((ClientData *)fileno(
+			ApacheUpload_FILE(upload)), TCL_READABLE);
+		    Tcl_RegisterChannel(interp, chan);
+		    channelname = Tcl_GetChannelName(chan);
+		    result = Tcl_NewStringObj(channelname, -1);
+		}
+	    } else if (!strcmp(method, "save")) {
+		/* save data to a specified filename  */
+
+		int sz;
+		char savebuffer[BUFSZ];
+		Tcl_Channel savechan = NULL;
+		Tcl_Channel chan = NULL;
+		if (objc != 5)
+		{
+		    Tcl_WrongNumArgs(interp, 4, objv, "filename");
+		    return TCL_ERROR;
+		}
+
+		savechan = Tcl_OpenFileChannel(interp, Tcl_GetString(objv[4]), "w", 0600);
+		if (savechan == NULL)
+		    return TCL_ERROR;
+		else
+		    Tcl_SetChannelOption(interp, savechan, "-translation", "binary");
+
+		chan = Tcl_MakeFileChannel((ClientData *)fileno(
+		    ApacheUpload_FILE(upload)), TCL_READABLE);
+		Tcl_SetChannelOption(interp, chan, "-translation", "binary");
+
+		while ((sz = Tcl_Read(chan, savebuffer, BUFSZ)))
+		{
+		    if (sz == -1)
+		    {
+			Tcl_AddErrorInfo(interp, Tcl_PosixError(interp));
+			return TCL_ERROR;
+		    }
+
+		    Tcl_Write(savechan, savebuffer, sz);
+		    if (sz < 4096)
+			break;
+		}
+		Tcl_Close(interp, savechan);
+		result = Tcl_NewIntObj(1);
+	    } else if (!strcmp(method, "data")) {
+		/* this sucks - we should use the hook, but I want to
+                   get everything fixed and working first */
+		if (upload_files_to_var)
+		{
+		    char *bytes = NULL;
+		    Tcl_Channel chan = NULL;
+
+		    bytes = Tcl_Alloc(ApacheUpload_size(upload));
+		    chan = Tcl_MakeFileChannel((ClientData *)fileno(
+			ApacheUpload_FILE(upload)), TCL_READABLE);
+		    Tcl_SetChannelOption(interp, chan, "-translation", "binary");
+		    Tcl_SetChannelOption(interp, chan, "-encoding", "binary");
+		    /* put data in a variable  */
+		    result = Tcl_NewObj();
+		    Tcl_ReadChars(chan, result, ApacheUpload_size(upload), 0);
+		} else {
+		    Tcl_AppendResult(interp, "Dtcl_UploadFilesToVar is not set", NULL);
+		    return TCL_ERROR;
+		}
+	    }
+	    Tcl_SetObjResult(interp, result);
+	} else {
+	    /* no variable found  */
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj("", -1));
+	}
+    } else if (!strcmp(command, "info")) {
+	char *varname = NULL;
+	char *infotype = NULL;
+	if (objc != 4)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, "varname exists|size|type|filename");
+	    return TCL_ERROR;
+	}
+	varname = Tcl_GetString(objv[2]);
+	infotype = Tcl_GetString(objv[3]);
+
+	upload = ApacheUpload_find(global_req->upload, varname);
+	if (upload != NULL)
+	{
+	    if (!strcmp(infotype, "exists"))
+	    {
+		result = Tcl_NewIntObj(1);
+	    } else if (!strcmp(infotype, "size")) {
+		result = Tcl_NewIntObj(ApacheUpload_size(upload));
+	    } else if (!strcmp(infotype, "type")) {
+		char *type = NULL;
+		type = (char *)ApacheUpload_type(upload);
+		if (type)
+		    result = Tcl_NewStringObj(type, -1);
+		else
+		    result = Tcl_NewStringObj("", -1);
+	    } else if (!strcmp(infotype, "filename")) {
+		result = Tcl_NewStringObj(upload->filename, -1);
+	    } else {
+		Tcl_AddErrorInfo(interp, "unknown upload info command");
+		return TCL_ERROR;
+	    }
+	} else {
+	    if (!strcmp(infotype, "exists")) {
+		result = Tcl_NewIntObj(0);
+	    } else {
+		Tcl_AddErrorInfo(interp, "variable doesn't exist");
+		return TCL_ERROR;
+	    }
+	}
+	Tcl_SetObjResult(interp, result);
+    }
+    return TCL_OK;
+}
+
+
 /* Tcl command to get, and print some information about the current
    state of affairs */
 
@@ -612,7 +784,7 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
     tble = ap_psprintf(global_rr->pool,
 		       "<table border=0 bgcolor=green><tr><td>\n"
 		       "<table border=0 bgcolor=\"#000000\">\n"
-		       "<tr><td align=center bgcolor=blue><font color=\"#ffffff\" size=+2>dtcl_info</font><br></td></tr>\n"
+		       "<tr><td align=center bgcolor=blue><font color=\"#ffffff\" size=\"+2\">dtcl_info</font><br></td></tr>\n"
 		       "<tr><td><font color=\"#ffffff\">Free cache size: %d</font><br></td></tr>\n"
 		       "<tr><td><font color=\"#ffffff\">PID: %d</font><br></td></tr>\n"
 		       "</table>\n"

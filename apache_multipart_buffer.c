@@ -6,7 +6,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -70,7 +70,7 @@ void* my_memstr(char* haystack, int haystacklen, const char* needle,
     int needlen = strlen(needle);
     int len = haystacklen;
     char *ptr = haystack;
-    
+
     /* iterate through first character matches */
     while( (ptr = memchr(ptr, needle[0], len)) ) {
 	/* calculate length after match */
@@ -100,10 +100,10 @@ int fill_buffer(multipart_buffer *self)
     if(self->bytes_in_buffer > 0 && self->buf_begin != self->buffer)
 	memmove(self->buffer, self->buf_begin, self->bytes_in_buffer);
     self->buf_begin = self->buffer;
-    
+
     /* calculate the free space in the buffer */
     bytes_to_read = self->bufsize - self->bytes_in_buffer;
-    
+
     /* read the required number of bytes */
     if(bytes_to_read > 0) {
 	char *buf = self->buffer + self->bytes_in_buffer;
@@ -158,7 +158,7 @@ char* next_line(multipart_buffer *self)
 	self->buf_begin = ptr;
 	self->bytes_in_buffer = 0;
     }
-    
+
     return line;
 }
 
@@ -171,7 +171,7 @@ char* get_line(multipart_buffer *self)
 	fill_buffer(self);
 	ptr = next_line(self);
     }
-    
+
 #ifdef DEBUG
     ap_log_rerror(MPB_ERROR, "get_line: '%s'", ptr);
 #endif
@@ -182,9 +182,8 @@ char* get_line(multipart_buffer *self)
 /* finds a boundary */
 int find_boundary(multipart_buffer *self, char *boundary)
 {
-    int len, bound_len = strlen(boundary);
     char *line;
-    
+
     /* loop thru lines */
     while( (line = get_line(self)) ) {
 #ifdef DEBUG
@@ -193,7 +192,7 @@ int find_boundary(multipart_buffer *self, char *boundary)
 #endif
 
       /* finished if we found the boundary */
-      if(strcmp(line, boundary) == 0)
+      if(strEQ(line, boundary))
 	  return 1;
     }
 
@@ -249,7 +248,7 @@ table *multipart_buffer_headers(multipart_buffer *self)
 			  "multipart_buffer_headers: '%s' = '%s'",
 			  key, value);
 #endif
-	    
+
 	    ap_table_add(tab, key, value);
 	}
 	else {
@@ -283,7 +282,7 @@ int multipart_buffer_read(multipart_buffer *self, char *buf, int bytes)
 
     /* maximum number of bytes we are reading */
     len = max < bytes-1 ? max : bytes-1;
-    
+
     /* if we read any data... */
     if(len > 0) {
 	/* copy the data */

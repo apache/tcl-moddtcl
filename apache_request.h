@@ -70,8 +70,8 @@ struct ApacheUpload {
 #define strcaseEQ(s1,s2) (!strcasecmp(s1,s2))
 #endif
 
-#ifndef strcaseEQN
-#define strcaseEQN(s1,s2,n) (!strncasecmp(s1,s2,n))
+#ifndef strncaseEQ
+#define strncaseEQ(s1,s2,n) (!strncasecmp(s1,s2,n))
 #endif
 
 #define DEFAULT_TABLE_NELTS 10
@@ -104,6 +104,11 @@ ApacheUpload *ApacheUpload_find(ApacheUpload *upload, char *name);
 
 #define ApacheRequest_upload(req) \
     ((req->parsed || (ApacheRequest_parse(req) == OK)) ? req->upload : NULL)
+
+
+#define ApacheUpload_FILE(upload) (upload->fp)
+
+#define ApacheUpload_size(upload) (upload->size)
 
 #define ApacheUpload_info(upload, key) \
 ap_table_get(upload->info, key)
