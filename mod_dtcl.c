@@ -675,7 +675,6 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 	}
 	ap_table_set(global_rr->headers_out, "Location", Tcl_GetStringFromObj (objv[2], (int *)NULL));
 	global_rr->status = 301;
-	ap_send_error_response(global_rr, 0); /* note that this is immediate XXX */
 	return TCL_RETURN;
     }
     else if (!strcmp("set", opt)) /* ### set ### */
@@ -812,22 +811,31 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
 	/* turn cookies into variables  */
 	if (!strncmp(hdrs[i].key, "Cookie", strlen("Cookie")))
 	{
-	    char *var;
+	    char *var, *var2;
 	    char *val = NULL;
 	    char *p = ap_pstrdup(global_rr->pool, hdrs[i].val);
 
-	    var = strtok(p, ";");
+	    var = p;
 
 	    while(var)
 	    {
 		val = strchr(var, '=');
+		var2 = strchr(var, ';');
+		if (var2 != NULL)
+		{
+		    *(var2++) = '\0';
+		    if ((*var2 == ' ') && (*var2 != '\0'))
+			var2++;
+		}
+
 		if (val)
 		{
 		    *val++ = '\0';
+		    var = cgiDecodeString(var);
 		    val = cgiDecodeString(val);
 		}
 		Tcl_SetVar2(interp, "::request::COOKIES", cgiDecodeString(var), val, 0);
-		var = strtok(NULL, ";");
+		var = var2;
 	    }
 	} else {
 	    Tcl_SetVar2(interp, "::request::ENVS", StringToUtf(hdrs[i].key), StringToUtf(hdrs[i].val), 0);
