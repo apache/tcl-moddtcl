@@ -9,11 +9,29 @@
 # Most of these variables can be set from the shell or command line
 # 
 
+# 
+# Command line options differ for different versions of gcc
+#
+# GCC 2.x
+# NATIVESTRUCT ?= -fnative-struct
+#
+# GCC 3.x
+NATIVESTRUCT ?= -mms-bitfields
+
+#
+# Experemental threaded flag - set this and mod_dtcl will link against a 
+# threaded version of Tcl
+#
+# THREADED =t
+#
+# XXX - not ready yet :)
+THREADED ?=
+
 #
 # I use this as a pointer to a good temporary location. 
 # The default works for most people
 #
-TEMP_LIBS ?= C:\\TEMP
+TEMP_LIBS ?= C:/TEMP
 
 #
 # Set this to your TCL version
@@ -24,25 +42,31 @@ TCL_VERSION ?= 84
 # 
 # Set TCL_HOME to where you have installed Tcl
 #
-TCL_HOME ?= C:\\"Program Files\\Tcl"
+TCL_HOME ?= C:/"Program Files/Tcl8.4"
 
 #
 # Set this to where you have installed Apache - used for the install step.
 #
-APACHE_HOME ?= C:\\"Program Files\\Apache Group\\Apache"
+APACHE_HOME ?= C:/"Program Files/Apache Group/Apache"
 
 #
 # Set APACHE_SRC to where your APACHE sources live.
 # NOTE: You must apply the diff to the os.h file as described in the
 # readme, and this directory must contain built sources, e.g. object files
+# If you use a binary install of Apache just set this to the same location
+# as APACHE_HOME like this:
+#APACHE_SRC ?= $(APACHE_HOME)
 #
-APACHE_SRC ?= ..\\..\\apache
+APACHE_SRC ?= ../../apache
 
 #
-# Set APACHE_INC to where the APACHE source include files live. This default
-# should be OK.
+# Set APACHE_INC to where the Apache source include files live. This default
+# should be OK if you built Apache from source.  If you used a binary install
+# of Apache, you probably want something like this assuming you set APACHE_SRC
+# as suggested above:
+#APACHE_INC ?= -I $(APACHE_SRC)/include
 #
-APACHE_INC ?= -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
+APACHE_INC ?= -I $(APACHE_SRC)/src/include -I $(APACHE_SRC)/src/os/win32
 
 
 #
@@ -51,19 +75,21 @@ APACHE_INC ?= -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
 # during a build, so a temporary location is OK
 #
 APACHE_LIB ?= $(TEMP_LIBS) 
-APACHE_DEF ?= $(TEMP_LIBS)\\ApacheCore.def
+APACHE_DEF ?= $(TEMP_LIBS)/ApacheCore.def
 
 #
 # You shouldn't have to change anything below this
 #
-ROOT_DIR = ..\\
-TCL_INC = $(TCL_HOME)\\include
-TCL_LIB = $(TCL_HOME)\\lib
+ROOT_DIR = ../
+TCL_INC = -I $(TCL_HOME)/include
+TCL_LIB = $(TCL_HOME)/lib
 
-CC = gcc -O3 -fnative-struct -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)\\VERSION`\""
+CFLAGS = -O3 $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\""
 
-INCLUDES = -I$(TCL_INC) $(APACHE_INC)
-LIBS = $(TCL_LIB)\\tcl$(TCL_VERSION).lib -L$(APACHE_LIB) -lapachecore 
+CC = gcc $(CFLAGS)
+
+INCLUDES = $(TCL_INC) $(APACHE_INC)
+LIBS = $(TCL_LIB)/tcl$(TCL_VERSION)$(THREADED).lib -L$(APACHE_LIB) -lapachecore 
 
 APREQ_OBJECTS = apache_cookie.o apache_multipart_buffer.o apache_request.o
 OBJECTS = tcl_commands.o parser.o channel.o $(APREQ_OBJECTS)
@@ -83,13 +109,22 @@ DLLWRAP_FLAGS = --def $(DLL_EXP_DEF) \
 #
 # By default we build a .so file (Apache > 1.3.14)
 #
+# "make so_style" gives you a mod_dtcl.so file
+# "make dll_style" gives you a ApacheModuleDtcl.dll
+# "make bin_style" gives you a mod_dtcl.so and assumes you used a binary install
+# of Apache
+
 all : so_style 
 
-dll_style:	APACHE_EXP=$(APACHE_SRC)\\CoreR\\ApacheCore.exp 
+bin_style:  APACHE_EXP=$(APACHE_HOME)/libexec/ApacheCore.exp
+bin_style:	DLL_BUILD=$(DLL_SO)	
+bin_style:	apache_libs $(DLL_SO)
+
+dll_style:	APACHE_EXP=$(APACHE_SRC)/CoreR/ApacheCore.exp 
 dll_style:	DLL_BUILD=$(DLL_DYNAMIC)
 dll_style:	apache_libs $(DLL_DYNAMIC)
 
-so_style:	APACHE_EXP=$(APACHE_SRC)\\src\\Release\\ApacheCore.exp
+so_style:	APACHE_EXP=$(APACHE_SRC)/src/Release/ApacheCore.exp
 so_style:	DLL_BUILD=$(DLL_SO)	
 so_style:	apache_libs $(DLL_SO)
 
@@ -125,7 +160,7 @@ clean:
 
 install: $(DLL_BUILD) $(DLL_EXP_LIB)
 	echo Installing mod_dtcl...
-	-cp $(DLL_BUILD) $(APACHE_HOME)\\modules
+	-cp $(DLL_BUILD) $(APACHE_HOME)/modules
 
 apache_libs:
 	-@mkdir $(TEMP_LIBS)
@@ -133,6 +168,6 @@ apache_libs:
 	echo EXPORTS > $(APACHE_DEF)
 	nm $(APACHE_EXP) |grep " U _" | sed "s/.* U _//" >> $(APACHE_DEF)
 	dlltool --def $(APACHE_DEF) --dllname ApacheCore.dll \
-		--output-lib $(TEMP_LIBS)\libapachecore.a -k
+		--output-lib $(TEMP_LIBS)/libapachecore.a -k
 	
 

@@ -1,39 +1,34 @@
-*** Vendors/Apache/Apache/src/os/win32/os.h	2001/02/02 08:36:15	1.1
---- Vendors/Apache/Apache/src/os/win32/os.h	2001/02/28 10:08:50	1.4
+*** os.h.orig	Mon Jun 17 21:08:26 2002
+--- os.h	Fri Jan 31 15:27:53 2003
 ***************
-*** 109,119 ****
---- 109,121 ----
+*** 120,126 ****
+--- 120,128 ----
   #define HAVE_UNC_PATHS
   typedef int uid_t;
   typedef int gid_t;
 + #ifndef __MINGW32__
   typedef int pid_t;
++ #endif /* !__MINGW32__ */
+  typedef int tid_t;
   #ifdef _MSC_VER
   /* modified to match declaration in sys/stat.h */
-  typedef unsigned short mode_t;
-  #endif
-+ #endif /* !__MINGW32__ */
-  typedef char * caddr_t;
-  
-  /*
 ***************
-*** 163,168 ****
---- 165,171 ----
+*** 181,186 ****
+--- 183,189 ----
   #define NO_OTHER_CHILD
   #define NO_RELIABLE_PIPED_LOGS
   
-+ #ifndef _AP_OS_IS_PATH_ABS_
++ #ifndef _AP_OS_IS_PATH_ABS_ 
   __inline int ap_os_is_path_absolute(const char *file)
   {
     /* For now, just do the same check that http_request.c and mod_alias.c
 ***************
-*** 170,175 ****
---- 173,179 ----
+*** 188,193 ****
+--- 191,197 ----
      */
     return file && (file[0] == '/' || (file[1] == ':' && file[2] == '/'));
   }
-+ #endif
++ #endif /* !_AP_OS_IS_PATH_ABS_ */
   
   #define stat(f,ps)  os_stat(f,ps)
   API_EXPORT(int) os_stat(const char *szPath,struct stat *pStat);
-

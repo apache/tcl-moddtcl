@@ -8,15 +8,19 @@ support MingW32 yet AFAIK.
 
 2)	Edit the win32\makefile in the mod_dtcl source tree to reflect your 
 environment, i.e. where is Tcl installed, where is Apache installed, where
-are your Apache sources and object files, etc.
+are your Apache sources and object files, etc.  The latest version of
+the makefile has a 'bin_style' target that will allow the use of a binary
+only install of Apache - see below and the makefile notes for more info.
 
 	You may also specify values for these variables from the command line,
 like this :
 
-	make TEMP_LIBS=C:\\TEMP\\OBJ 
+	make TEMP_LIBS=C:/TEMP/OBJ 
 
-	NOTE: Be sure to use the double slashes and quote spaces!  
-	See the makefile for the complete list of variable options.
+	NOTE:  See the makefile for the complete list of variable options.
+	The latest version of the makefile has a 'bin_style' target that will 
+	allow the use of a binary-only install of Apache - see below and the 
+    makefile notes for more info.
 
 3)  Apply the diffs for Apache.  The diff for Apache wraps a few declarations 
 and one #include directive in the os.h file that aren't needed or used with the MingW32 compiler.  
@@ -30,9 +34,16 @@ and one #include directive in the os.h file that aren't needed or used with the 
 4)  Run make.  There will be some warnings about a redefinition - you can 
 ignore it. You should be left with a file called mod_dtcl.so.  
 
-	NOTE: If you are using Apache 1.3.14 or older that uses .dll files 
+	NOTES: 
+
+	If you are using Apache 1.3.14 or older that uses .dll files 
 	for modules, you can run 'make dll_style' to get a dll file.  Or 
 	you can simply rename the .so file :) 
+
+	If you are using a recent binary install of Apache, you can run
+	'make bin_style' to produce a 'mod_dtcl.so' without needing the
+	Apache sources!  See the makefile for details.
+
 
 5)  Run make install.  Make the changes to your Apache configuration as 
 described on the mod_dtcl documentation, and you are off.
@@ -42,6 +53,7 @@ Notes :
 	-- These instructions assume you have the MingW32 gcc setup as well
  	   as a good collection of GNU tools on your NT machine (sed, grep, etc).
 	   They also assume you have Tcl setup.
+	-- The makefile now supports GCC 2.X or GCC 3.x (new default).  
   	-- You will need a fairly recent version of the MingW32 toolset and 
 	   the associated win32api fileset - see http://www.mingw.org for 
 	   details on obtaining new releases.
