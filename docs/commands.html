@@ -91,11 +91,12 @@
 
       <li>
 	<code><b>hgetvars</b></code><br> Get environmental, and Cookie
-	variables. This is in a seperate command so as not to make the
-	server do this every time you load a .ttml file. <code>ENVS</code> and
+	variables. This is in a separate command so as not to make the
+	server do this every time you load a .ttml file. <code>ENVS</code>, <code>CLIENT_ENVS</code> and
 	<code>COOKIES</code> are the associative arrays created.  <code>ENVS</code> contains
-	environmental variables, and <code>COOKIES</code> contains any cookies
-	recieved from the client.
+	environmental variables. <code>CLIENT_ENVS</code> contains the headers received from the client. 
+	<code>COOKIES</code> contains any cookies
+	received from the client.
       </li>
       <li>
 	<code><b>include <i>filename</i></b></code><br>	      

@@ -132,6 +132,15 @@ if { [ array exists ENVS ] } {
     hputs "&lt;/ul>"
 }
 
+if { [ array exists CLIENT_ENVS ] } {
+    
+    hputs "&lt;ul>"
+    foreach { vr } [ array names CLIENT_ENVS ]  {
+        hputs "&lt;li>(CLIENT_ENVS) $vr = $CLIENT_ENVS($vr)"
+    }
+    hputs "&lt;/ul>"
+}
+
 if { [ array exists COOKIES ] } {
     
     hputs "&lt;ul>"
@@ -161,6 +170,14 @@ if { [ array exists ENVS ] } {
     hputs "<ul>"
     foreach { vr } [ array names ENVS ]  {
         hputs "<li>(ENVS) $vr = $ENVS($vr)"
+    }
+    hputs "</ul>"
+}
+
+if { [ array exists CLIENT_ENVS ] } {
+    hputs "<ul>"
+    foreach { vr } [ array names CLIENT_ENVS ]  {
+        hputs "<li>(CLIENT_ENVS) $vr = $CLIENT_ENVS($vr)"
     }
     hputs "</ul>"
 }

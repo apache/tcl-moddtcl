@@ -1,3 +1,11 @@
+libapache-mod-dtcl (0.12.0-1) unstable; urgency=low
+
+  * New array for client header information - CLIENT_ENVS.  ENVS variables
+    could be overwritten by client headers, presenting a possible security
+    risk.
+
+ -- David N. Welton <davidw@debian.org>  Wed, 26 Jun 2002 15:03:04 +0200
+
 libapache-mod-dtcl (0.11.8-1) unstable; urgency=low
 
   * Make sure to check the correct variable names with 'list' and

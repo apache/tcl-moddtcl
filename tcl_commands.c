@@ -370,9 +370,16 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     array_header *env_arr;
     table_entry  *env;
     Tcl_Obj *EnvsObj = NULL;
+#if HEADERS_IN_ENVS == 0
+	Tcl_Obj *ClientEnvsObj = NULL;
+#endif
 
     EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
     Tcl_IncrRefCount(EnvsObj);
+#if HEADERS_IN_ENVS == 0
+	ClientEnvsObj = Tcl_NewStringObj("::request::CLIENT_ENVS", -1);
+    Tcl_IncrRefCount(ClientEnvsObj);
+#endif
     date = globals->r->request_time;
     /* ensure that the system area which holds the cgi variables is empty */
     ap_clear_table(globals->r->subprocess_env);
@@ -455,8 +462,13 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	if (!hdrs[i].key)
 	    continue;
 	else {
+#if HEADERS_IN_ENVS == 0
+		Tcl_ObjSetVar2(interp, ClientEnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key, POOL),
+			   STRING_TO_UTF_TO_OBJ(hdrs[i].val, POOL), 0);
+#else
 	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key, POOL),
 			   STRING_TO_UTF_TO_OBJ(hdrs[i].val, POOL), 0);
+#endif
 	}
     }
 

@@ -18,9 +18,16 @@
    handler, instead of in child init handlers. */
 #ifdef __MINGW32__
 #define THREADED_TCL 1
-#else 
+#else
 #define THREADED_TCL 0 /* Unless you have MINGW32, modify this one! */
 #endif
+
+/* If you want all 'environmental' variables to be accessed through
+   the ENVS array, set this to 1.  Note that this could be a security
+   risk for scripts which depend on these values, as they could be
+   overwritten via client headers.  */
+
+#define HEADERS_IN_ENVS 0
 
 /* If you want to show the mod_dtcl version, you can define this to 0.
    Otherwise, set this to 1 to hide the version from potential
@@ -30,7 +37,7 @@
 /* Allow <+ +> tags for backwards compatibility.  Use the
    mod_dtcl/contrib/newtags.sh script to update your .ttml files to
    use <? ?> tags. */
-#define USE_OLD_TAGS 0 
+#define USE_OLD_TAGS 0
 
 /* Turn off 'old-style' $VARS variable handling, and use only the
    'var' command. */
