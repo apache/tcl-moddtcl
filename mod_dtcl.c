@@ -325,6 +325,18 @@ char *StringToUtf(char *input)
 #endif
 }
 
+/* Function to be used should we desire to upload files to a variable */
+int dtcl_upload_hook(void *ptr, char *buf, int len)
+{
+    Tcl_Interp *interp = ptr;
+    Tcl_ObjSetVar2(interp,
+		   Tcl_NewStringObj("::request::UPLOAD", -1),
+		   Tcl_NewStringObj("data", -1),
+		   Tcl_NewByteArrayObj(buf, len),
+		   TCL_APPEND_VALUE);
+    return len;
+}  
+
 /* Load, cache and eval a Tcl file  */
 
 int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
@@ -407,7 +419,7 @@ int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
     }
 #else
     Tcl_EvalFile(interp, r->filename);
-#endif
+#endif /* 1 */
     print_headers(global_rr);
     flush_output_buffer(global_rr);
 
@@ -691,6 +703,12 @@ int send_content(request_rec *r)
 
     /* Apache Request stuff */
     req = ApacheRequest_new(r);
+//    if (upload_files_to_var)
+//    {
+    req->hookptr = interp;
+    req->ApacheUploadHook = dtcl_upload_hook; 
+//    }
+
     ApacheRequest___parse(req);
     
     /* take results and create tcl variables from them */
@@ -712,18 +730,14 @@ int send_content(request_rec *r)
 	}
 	
     }
-    upload = req->upload;
+   upload = req->upload;
+
 //    while (upload)
     if (upload)
     {
 	char *type = NULL;
 	char *channelname = NULL;
 	Tcl_Channel chan;
-/* 	Tcl_ObjSetVar2(interp,
-		       Tcl_NewStringObj("::request::UPLOAD", -1),
-		       Tcl_NewStringObj("data", -1),
-		       Tcl_NewByteArrayObj(acum, acumlen),
-		       0);  */
 
 	/* The name of the file uploaded  */
 	Tcl_ObjSetVar2(interp,
@@ -752,14 +766,17 @@ int send_content(request_rec *r)
 			   Tcl_NewStringObj(type, -1), /* kill end of line */
 			   0);
 	}
-	chan = Tcl_MakeFileChannel((ClientData *)fileno(upload->fp), TCL_READABLE);
-	Tcl_RegisterChannel(interp, chan);
-	channelname = Tcl_GetChannelName(chan);
-	Tcl_ObjSetVar2(interp,
-		       Tcl_NewStringObj("::request::UPLOAD", -1),
-		       Tcl_NewStringObj("channelname", -1),
-		       Tcl_NewStringObj(channelname, -1), /* kill end of line */
-		       0);
+	if (!upload_files_to_var)
+	{
+	    chan = Tcl_MakeFileChannel((ClientData *)fileno(upload->fp), TCL_READABLE);
+	    Tcl_RegisterChannel(interp, chan);
+	    channelname = Tcl_GetChannelName(chan);
+	    Tcl_ObjSetVar2(interp,
+			   Tcl_NewStringObj("::request::UPLOAD", -1),
+			   Tcl_NewStringObj("channelname", -1),
+			   Tcl_NewStringObj(channelname, -1), /* kill end of line */
+			   0);
+	}
 	
 //	upload = upload->next;
     }

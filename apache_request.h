@@ -19,6 +19,8 @@ typedef struct {
     int parsed;
     int post_max;
     int disable_uploads;
+    int (*ApacheUploadHook)(void *ptr, char *buf, int len);
+    void *hookptr; /* data for UploadHook */
     request_rec *r;
 } ApacheRequest;
 
@@ -75,6 +77,7 @@ int ApacheRequest___parse(ApacheRequest *req);
 FILE *ApacheRequest_tmpfile(ApacheRequest *req);
 ApacheUpload *ApacheUpload_new(ApacheRequest *req);
 ApacheUpload *ApacheUpload_find(ApacheUpload *upload, char *name);
+
 
 #define ApacheRequest_upload(req) \
     ((req->parsed || (ApacheRequest_parse(req) == OK)) ? req->upload : NULL)

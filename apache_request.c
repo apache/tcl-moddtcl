@@ -203,6 +203,8 @@ ApacheRequest *ApacheRequest_new(request_rec *r)
     req->upload = NULL;
     req->post_max = -1;
     req->disable_uploads = 0;
+//    req->ApacheUploadHook = NULL;
+//    req->hookptr = NULL;
     req->parsed = 0;
     req->r = r;
 
@@ -377,6 +379,7 @@ int ApacheRequest_parse_multipart(ApacheRequest *req)
 	const char *cd, *param=NULL, *filename=NULL;
 	char buff[FILLUNIT];
 	int blen;
+	int wlen; 
 
 	if (!header) {
 	    return OK;
@@ -417,27 +420,34 @@ int ApacheRequest_parse_multipart(ApacheRequest *req)
 		upload = ApacheUpload_new(req);
 		req->upload = upload;
 	    }
-
-	    if (!(upload->fp = ApacheRequest_tmpfile(req))) {
-		return HTTP_INTERNAL_SERVER_ERROR;
-	    }
+ 	    if (req->ApacheUploadHook == NULL) {
+		if (!(upload->fp = ApacheRequest_tmpfile(req))) {
+		    return HTTP_INTERNAL_SERVER_ERROR;
+		}
+	    }  
 
 	    upload->info = header;
 	    upload->filename = ap_pstrdup(req->r->pool, filename);
 	    upload->name = ap_pstrdup(req->r->pool, param);
 
 	    while ((blen = multipart_buffer_read(mbuff, buff, sizeof(buff)))) {
-		/* write the file */
-	        /* XXX: do better error-checking on the fwrite? */
-		upload->size += fwrite(buff, 1, blen, upload->fp); 	
+		if (req->ApacheUploadHook != NULL) {
+		    wlen = req->ApacheUploadHook(req->hookptr, buff, blen);
+		} else {
+		    wlen = fwrite(buff, 1, blen, upload->fp);
+		}
+		if (wlen != blen) {
+		    return HTTP_INTERNAL_SERVER_ERROR;
+		}
+		upload->size += wlen;
 	    }
 
-	    if (upload->size > 0) {
+ 	    if (upload->size > 0 && (req->ApacheUploadHook == NULL)) {
 		fseek(upload->fp, 0, 0);
 	    }
 	    else {
 		upload->fp = NULL;
-	    }
+	    }  
 	}
     }
 
