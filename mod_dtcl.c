@@ -183,6 +183,7 @@ static int outputproc(ClientData instancedata, char *buf, int toWrite, int *erro
 
 static int closeproc(ClientData instancedata, Tcl_Interp *interp2)
 {
+    print_headers(global_rr);
     flush_output_buffer(global_rr);
     return 0;
 }
@@ -303,16 +304,14 @@ int print_error(request_rec *r, int htmlflag, char *errstr)
     return 0;
 }
 
-/* Make sure that everything in the output buffer has been flushed,
-   and that headers have been printed */
+/* Make sure that everything in the output buffer has been flushed. */
 
 int flush_output_buffer(request_rec *r)
 {
-    print_headers(r);
     if (obuffer.len != 0)
     {
 	ap_rwrite(obuffer.buf, obuffer.len, r);
-	free(obuffer.buf);
+	Tcl_Free(obuffer.buf);
 	obuffer.len = 0;
 	obuffer.buf = NULL;
     }
@@ -455,6 +454,7 @@ int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
 #else
     Tcl_EvalFile(interp, r->filename);
 #endif
+    print_headers(global_rr);
     flush_output_buffer(global_rr);
 
     return OK;
@@ -639,6 +639,7 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 
     if (Tcl_EvalObj(interp, outbuf) == TCL_ERROR)
     {
+	print_headers(global_rr);
 	flush_output_buffer(global_rr);
 	errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
 	print_error(r, 0, errorinfo);
@@ -648,7 +649,8 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 /* 		    "</pre><b>OUTPUT BUFFER</b><pre>\n",
 		    Tcl_GetStringFromObj(outbuf, (int *)NULL));  */
     } else {
-	/* XXX we make sure to flush the output if buffer_add was the only output */
+	/* We make sure to flush the output if buffer_add was the only output */
+	print_headers(global_rr);
 	flush_output_buffer(global_rr);
     }
     return OK;
@@ -804,6 +806,23 @@ int send_content(request_rec *r)
     return OK;
 }
 
+/* This is done in two places, so I decided to group the creates in
+   one function */
+
+void tcl_create_commands(Tcl_Interp *interp)
+{
+    Tcl_CreateObjCommand(interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "dtcl_info", Dtcl_Info, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "no_body", No_Body, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+}
+
 void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
@@ -840,16 +859,7 @@ void tcl_init_stuff(server_rec *s, pool *p)
 	ap_log_error(APLOG_MARK, APLOG_ERR, s, Tcl_GetStringResult(interp));
 	exit(1);
     }
-    Tcl_CreateObjCommand(interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "dtcl_info", Dtcl_Info, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-
+    tcl_create_commands(interp);
     namespacePrologue = Tcl_NewStringObj(
 	"catch { namespace delete request }\n"
 	"namespace eval request { }\n"
@@ -894,27 +904,9 @@ void tcl_init_stuff(server_rec *s, pool *p)
 	if (!mydsc->server_interp)
 	{
 	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	    Tcl_CreateObjCommand(mydsc->server_interp, "dtcl_info", Dtcl_Info, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-/* 
-	    Tcl_CreateAlias(mydsc->server_interp, "buffer_add", interp, "buffer_add", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "hputs", interp, "hputs", 0, NULL);	    
-	    Tcl_CreateAlias(mydsc->server_interp, "buffered", interp, "buffered", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "headers", interp, "headers", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "hgetvars", interp, "hgetvars", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "include", interp, "include", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "parse", interp, "parse", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "hflush", interp, "hflush", 0, NULL);
-	    Tcl_CreateAlias(mydsc->server_interp, "dtcl_info", interp, "dtcl_info", 0, NULL);
+	    tcl_create_commands(mydsc->server_interp);
 	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
-	    Tcl_RegisterChannel(mydsc->server_interp, achan);  */
+	    Tcl_RegisterChannel(mydsc->server_interp, achan);  
 	}
 	mydsc->server_name = ap_pstrdup(p, sr->server_hostname);
 	sr = sr->next;

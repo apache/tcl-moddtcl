@@ -78,7 +78,8 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     } else {
 	Tcl_SetChannelOption(interp, fd, "-translation", "lf");
     }
-    flush_output_buffer(global_rr);
+/*     print_headers(global_rr);
+    flush_output_buffer(global_rr);  */
     while ((sz = Tcl_Read(fd, buf, sizeof(buf) - 1)))
     {
 	if (sz == -1)
@@ -88,9 +89,10 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	}
 
 	buf[sz] = '\0';
-	memwrite(&obuffer, buf, sz);
 
-/*   	ap_rwrite(buf, sz, global_rr);   */
+        /* we could include code to either ap_pwrite this or memwrite
+           it, depending on buffering */
+	memwrite(&obuffer, buf, sz);
 
 	if (sz < sizeof(buf) - 1)
 	    break;
@@ -153,7 +155,8 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	{
 	    memwrite(&obuffer, arg1, length);
 	} else {
-	    flush_output_buffer(global_rr);
+	    print_headers(global_rr);
+	    flush_output_buffer(global_rr); 
 	    ap_rwrite(arg1, length, global_rr);
 	}
     }
@@ -273,10 +276,11 @@ int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	buffer_output = 1;
     } else if (!strncmp(opt, "off", 3)) {
 	buffer_output = 0;
+	print_headers(global_rr);
+	flush_output_buffer(global_rr);
     } else {
 	return TCL_ERROR;
     }
-    flush_output_buffer(global_rr);
     return TCL_OK;
 }
 /* Tcl command to flush the output stream */
@@ -288,7 +292,7 @@ int HFlush(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	Tcl_WrongNumArgs(interp, 1, objv, NULL);
 	return TCL_ERROR;
     }
-
+    print_headers(global_rr);
     flush_output_buffer(global_rr);
     ap_rflush(global_rr);
     return TCL_OK;
@@ -439,8 +443,21 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 		       "<tr><td><font color=\"#ffffff\">PID: %d</font><br></td></tr>\n"
 		       "</table>\n"
 		       "</td></tr></table>\n", cacheFreeSize, getpid());
-    flush_output_buffer(global_rr);
-    print_headers(global_rr);
+/*     print_headers(global_rr);
+    flush_output_buffer(global_rr);  */
+    memwrite(&obuffer, tble, strlen(tble));
     ap_rputs(tble, global_rr);
+    return TCL_OK;
+}
+
+/* Tcl command to erase body, so that only header is returned.
+   Necessary for 304 responses */
+
+int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+{
+    print_headers(global_rr);
+    Tcl_Free(obuffer.buf);
+    obuffer.buf = NULL;
+    obuffer.len = 0;    
     return TCL_OK;
 }
