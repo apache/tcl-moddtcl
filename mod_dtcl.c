@@ -3,7 +3,7 @@
 /* ====================================================================
  * The Apache Software License, Version 1.1
  *
- * Copyright (c) 2000 The Apache Software Foundation.  All rights
+ * Copyright (c) 2000, 2001 The Apache Software Foundation.  All rights
  * reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,9 +30,9 @@
  *    software without prior written permission. For written
  *    permission, please contact apache@apache.org.
  *
- * 5. Products derived from this software may not be called "Apache",
- *    nor may "Apache" appear in their name, without prior written
- *    permission of the Apache Software Foundation.
+ * 5. Products derived from this software may not be called "mod_dtcl"
+ *    or "dtcl", nor may "dtcl" appear in their name, without prior
+ *    written permission of the Apache Software Foundation.
  *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -55,21 +55,12 @@
  *
  * Portions of this software are based upon public domain software
  * originally written at the National Center for Supercomputing Applications,
- * University of Illinois, Urbana-Champaign.
- */
+ * University of Illinois, Urbana-Champaign.  */
 
 /* $Id$  */
 
 /* mod_dtcl.c by David Welton <davidw@apache.org> - originally mod_include.  */
 /* See http://tcl.apache.org/mod_dtcl/credits.ttml for additional credits. */
-
-/*
- * http_include.c: Handles the server-parsed HTML documents
- *
- * Original by Rob McCool; substantial fixups by David Robinson;
- * incorporated into the Apache module framework by rst.
- *
- */
 
 #include "httpd.h"
 #include "http_config.h"
@@ -739,6 +730,7 @@ static int send_content(request_rec *r)
 
     /* Apache Request stuff */
     req = ApacheRequest_new(r);
+    ApacheRequest_set_post_max(req, upload_max);
     global_req = req;
 #if 0
     if (upload_files_to_var)

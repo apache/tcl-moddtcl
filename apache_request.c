@@ -342,8 +342,9 @@ FILE *ApacheRequest_tmpfile(ApacheRequest *req, ApacheUpload *upload)
     request_rec *r = req->r;
     FILE *fp;
     char prefix[] = "apreq";
-    char *name;
-    int fd, tries = 100;
+    char *name = NULL;
+    int fd = 0; 
+    int tries = 100;
 
     while (--tries > 0) {
 	if ( (name = tempnam(req->temp_dir, prefix)) == NULL )
