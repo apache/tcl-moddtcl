@@ -1431,11 +1431,8 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
     dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
 
     if (arg == NULL || arg2 == NULL)
-    {
-	ap_log_error(APLOG_MARK, APLOG_ERR, global_rr->server, "Mod_Dtcl Error: Dtcl_Script requires two arguments");
-	return NULL;
-    }
-    
+	return "Mod_Dtcl Error: Dtcl_Script requires two arguments";
+   
     objarg = Tcl_NewStringObj(arg2, -1);
     Tcl_AppendToObj(objarg, "\n", 1);
     if (strcmp(arg, "GlobalInitScript") == 0) {
@@ -1449,7 +1446,7 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
     } else if (strcmp(arg, "AfterScript") == 0) {
 	conf->dtcl_after_script = objarg;
     } else {
-	ap_log_error(APLOG_MARK, APLOG_ERR, global_rr->server, "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript");
+	return "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript";
     }
     return NULL;
 }
@@ -1512,8 +1509,8 @@ static const handler_rec dtcl_handlers[] =
 
 static const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "general script command"},
-    {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "number of ttml scripts cached"},
+    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript scriptname.tcl"},
+    {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {NULL}
 };
 
