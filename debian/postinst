@@ -1,9 +1,9 @@
 #!/bin/bash
 # postinst for libapache-mod-dtcl, based on:
-# postinst for libapache-mod-perl, based on:
 # postinst.skeleton
 # Skeleton maintainer script showing all the possible cases.
 # Written by Charles Briscoe-Smith, March-April 1998.  Public Domain.
+# Updated and added apache-ssl patch by János Holányi <csani@lme.linux.hu>, 2001
 
 # Abort if any command returns an error value
 set -e
@@ -31,6 +31,22 @@ enable () {
 	return 0
 }
 
+enable_ssl () {
+       [ -f /etc/apache-ssl/httpd.conf ] || exit 0
+       if grep '^LoadModule.*mod_dtcl\.so' /etc/apache-ssl/httpd.conf 2>&1 >/dev/null
+       then
+               return 0
+       fi
+       echo -n "A new Apache module has been installed.  Reconfigure apache-ssl [Y/n]? "
+       read CONFIG
+       if [ ".$CONFIG" == ".n" -o ".$CONFIG" == ".N" ]
+       then
+               return 0
+       fi
+        [ -x /usr/sbin/apache-sslconfig ] && /usr/sbin/apache-sslconfig --force-modules
+       return 0
+}
+
 # Restart apache if user wants.
 ask_restart () {
 	echo -n "An Apache module has been modified.  Restart apache [Y/n]? "
@@ -39,6 +55,15 @@ ask_restart () {
 	then
 		/usr/sbin/apachectl restart
 	fi
+}
+
+ask_restart_ssl () {
+       echo -n "An Apache module has been modified.  Restart apache-ssl [Y/n]? "
+       read CONFIG
+       if [ ".$CONFIG" != ".n" -a ".$CONFIG" != ".N" ]
+       then
+               /usr/sbin/apache-sslctl restart
+       fi
 }
 
 case "$1" in
@@ -51,17 +76,20 @@ case "$1" in
       # which version was most recently configured, or even whether
       # there is a most recently configured version.
 		enable
+               enable_ssl
       :
     elif test -z "$2" -o "$2" = "<unknown>"; then
       # The package has not ever been configured on this system, or was
       # purged since it was last configured.
       # DJ: So let's enable the module!
 		enable
+               enable_ssl
       :
     else
       # Version $2 is the most recently configured version of this
       # package.
 		ask_restart
+               ask_restart_ssl
       :
     fi ;;
   abort-upgrade | abort-remove | abort-deconfigure)
@@ -78,11 +106,15 @@ if [ "$1" = "configure" ]; then
 fi
 
 cat <<EOF
-You must add the following line to your config files:
-http.conf:
-LoadModule dtcl_module mod_dtcl.so
+You must add the following line to your httpd.conf config files
+(of both apache and/or apache-ssl):
 
-srm.conf:
+To Section 1: Global Environment section:
+
+LoadModule dtcl_module /usr/lib/apache/1.3/mod_dtcl.so
+
+To Section 2: 'Main' server configuration, <IfModule mod_mime.c> section:
+
 AddType application/x-httpd-tcl .ttml
 EOF
 

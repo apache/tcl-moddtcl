@@ -89,7 +89,7 @@ typedef struct {
     ApacheRequest *req;         /* libapreq request  */
 } dtcl_interp_globals;
 
-int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel);
+int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, char *filename, int toplevel);
 int set_header_type(request_rec *, char *);
 int print_headers(request_rec *);
 int print_error(request_rec *, int, char *);
