@@ -817,7 +817,7 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     table_entry  *env;
 
     Tcl_Obj *EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
-
+    Tcl_IncrRefCount(EnvsObj);
     /* ensure that the system area which holds the cgi variables is empty */
     ap_clear_table(global_rr->subprocess_env);
 
@@ -1853,6 +1853,16 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	if (!mydsc->server_interp)
 	{
 	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	    Tcl_CreateObjCommand(mydsc->server_interp, "dtcl_info", Dtcl_Info, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+/* 
 	    Tcl_CreateAlias(mydsc->server_interp, "buffer_add", interp, "buffer_add", 0, NULL);
 	    Tcl_CreateAlias(mydsc->server_interp, "hputs", interp, "hputs", 0, NULL);	    
 	    Tcl_CreateAlias(mydsc->server_interp, "buffered", interp, "buffered", 0, NULL);
@@ -1863,7 +1873,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	    Tcl_CreateAlias(mydsc->server_interp, "hflush", interp, "hflush", 0, NULL);
 	    Tcl_CreateAlias(mydsc->server_interp, "dtcl_info", interp, "dtcl_info", 0, NULL);
 	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
-	    Tcl_RegisterChannel(mydsc->server_interp, achan);
+	    Tcl_RegisterChannel(mydsc->server_interp, achan);  */
 	}
 	mydsc->server_name = ap_pstrdup(p, sr->server_hostname);
 	sr = sr->next;
@@ -1888,6 +1898,7 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
 	return "Mod_Dtcl Error: Dtcl_Script requires two arguments";
    
     objarg = Tcl_NewStringObj(arg2, -1);
+    Tcl_IncrRefCount(objarg);
     Tcl_AppendToObj(objarg, "\n", 1);
     if (strcmp(arg, "GlobalInitScript") == 0) {
 	dsc->dtcl_global_init_script = objarg;
