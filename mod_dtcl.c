@@ -439,7 +439,7 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 
 	char c;
 	int ch;
-	int l = strlen(ENDING_SEQUENCE), l2 = strlen(STARTING_SEQUENCE), p = 0;
+	int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
 
 	FILE *f = NULL;
 
@@ -464,23 +464,38 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 
 	while ((ch = getc(f)) != EOF)
 	{
-	    /* ok, if we find the string, then we start on another loop    */
-	    /*            if (!find_string(f, STARTING_SEQUENCE, r))  */
+	    if (ch == -1)
+		if (ferror(f))
+		{
+		    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
+				 "Encountered error in mod_dtcl getchar routine while reading %s",
+				 r->uri);
+			ap_pfclose( r->pool, f);
+		}	    
+	    c = ch;
 	    if (!inside)
 	    {
 		/* OUTSIDE  */
-		if (ch == -1)
-		    if (ferror(f))
+
+#if USE_OLD_TAGS == 1
+		if (c == '<')
+		{
+		    int nextchar = getc(f);
+		    if (nextchar == '+')
 		    {
-			ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
-				     "Encountered error in mod_dtcl getchar routine while reading %s",
-				     r->uri);
-			ap_pfclose( r->pool, f);
+			Tcl_AppendToObj(outbuf, "\"\n", 2);
+			inside = 1;
+			p = 0;
+			continue;			
+		    } else {
+			ungetc(nextchar, f);
 		    }
-		c = ch;
+		}
+#endif
+
 		if (c == strstart[p])
 		{
-		    if (( ++p ) == l)
+		    if ((++p) == endseqlen)
 		    {
 			/* ok, we have matched the whole ending sequence - do something  */
 			Tcl_AppendToObj(outbuf, "\"\n", 2);
@@ -489,7 +504,8 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 			continue;
 		    }
 		} else {
-		    Tcl_AppendToObj(outbuf, (char *)strstart, p);
+		    if (p > 0)
+			Tcl_AppendToObj(outbuf, (char *)strstart, p);
 		    /* or else just put the char in outbuf  */
 		    if (c == '$')
 			Tcl_AppendToObj(outbuf, "\\$", -1);
@@ -509,24 +525,29 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 		}
 	    } else {
 		/* INSIDE  */
-		if (ch == -1)
-		    if (ferror(f))
-		    {
-			ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
-				     "Encountered error in mod_dtcl getchar routine while reading %s",
-				     r->uri);
-			ap_pfclose( r->pool, f);
-			return DONE;
-		    }
 
-		c  = ch;
+#if USE_OLD_TAGS == 1
+		if (c == '+')
+		{
+		    int nextchar = getc(f);
+		    if (nextchar == '>')
+		    {
+			Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+			inside = 0;
+			p = 0;
+			continue;
+		    } else {
+			ungetc(nextchar, f);
+		    }
+		}
+#endif
 
 		if (c == strend[p])
 		{
-		    if ((++p) == l2)
+		    if ((++p) == startseqlen)
 		    {
-			inside = 0;
 			Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+			inside = 0;
 			p = 0;
 			continue;
 		    }
@@ -534,7 +555,8 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 		else
 		{
 		    /*  plop stuff into outbuf, which we will then eval   */
-		    Tcl_AppendToObj(outbuf, (char *)strend, p);
+		    if (p > 0)
+			Tcl_AppendToObj(outbuf, (char *)strend, p);
 		    Tcl_AppendToObj(outbuf, &c, 1);
 		    p = 0;
 		}
@@ -867,12 +889,16 @@ void tcl_init_stuff(server_rec *s, pool *p)
     }
 }
 
-void dtcl_init_handler(server_rec *s, pool *p)
+MODULE_VAR_EXPORT void dtcl_init_handler(server_rec *s, pool *p)
 {
 #if THREADED_TCL == 0
     tcl_init_stuff(s, p);
 #endif
+#ifndef HIDE_DTCL_VERSION
+    ap_add_version_component("mod_dtcl/"DTCL_VERSION);
+#else
     ap_add_version_component("mod_dtcl");
+#endif /* !HIDE_DTCL_VERSION */
 }
 
 const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)

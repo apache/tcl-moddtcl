@@ -1,5 +1,5 @@
 <table>
-<+
+<?
 # Creates a table that displays the times in various locations in the
 # world - davidw
 
@@ -18,5 +18,5 @@ foreach office $offices {
     hputs "</tt></td></tr>"
 }
 unset env(TZ)
-+>
+?>
 </table>

@@ -43,7 +43,7 @@ apache_multipart_buffer.o: apache_multipart_buffer.c apache_multipart_buffer.h
 apache_request.o: apache_request.c apache_request.h
 	$(COMPILE)
 mod_dtcl.o: mod_dtcl.c mod_dtcl.h tcl_commands.h apache_request.h
-	$(COMPILE)
+	$(COMPILE) -DDTCL_VERSION=`cat VERSION`
 tcl_commands.o: tcl_commands.c tcl_commands.h mod_dtcl.h
 	$(COMPILE)
 

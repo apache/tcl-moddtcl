@@ -1,4 +1,4 @@
-<+
+<?
 
 hgetvars
 
@@ -31,4 +31,4 @@ if { [ array exists COOKIES ] } {
     }
 }
 
-+>
+?>

@@ -1,0 +1,40 @@
+Steps for building mod_dtcl under NT for Apache with MingW32 
+(http://www.mingw.org/). 
+
+1)  Get Apache for NT, I used version 1.3.X.  You can use the binary release 
+or build it from source.  I built from source because I needed to also include
+mod_ssl.  Note that I used VC++ to build Apache - they don't support MingW32 
+yet AFAIK.
+
+2) Edit the win32\makefile in the mod_dtcl source tree to reflect 
+your environment, i.e. where is Tcl installed, where is Apache installed, where
+are your Apache sources and object files, etc.
+
+3)  Apply the diffs for Apache.  The diff for Apache wraps a few 
+declarations and one #include directive in the os.h file that aren't needed or 
+used with the MingW32 compiler.  I used GNU patch to do this with :
+
+	patch -c -b < os.h.diff
+
+4)  Run make.  There will be some warnings about a redefinition - 
+you can ignore it. You should be left with a file called ApacheModuleDtcl.dll.
+If you are using Apache 1.3.17 or newer that uses .so files for modules, you can
+run 'make so_style' to get a mod_dtcl.so.  Or you can simply rename the dll :)   
+
+5)  Run make install.  Make the changes to your Apache configuration as 
+described on the mod_dtcl documentation, and you are off.
+
+Notes :
+
+	-- Tcl needs to be in the path of the web server
+	-- These instructions assume you have the MingW32 gcc setup as well 
+	   as a good collection of GNU tools on your NT machine (sed, grep, etc).
+	   They also assume you have Tcl setup.  
+	-- You will need a fairly recent version of the MingW32 toolset and the 
+	   associated win32api fileset - see http://www.mingw.org for details on 
+	   obtaining new releases.
+	-- I've tried my best to make these instructions error free but
+	   mistakes are possible.  
+
+Good Luck,
+Craig

@@ -1,3 +1,8 @@
 Documentation for mod_dtcl, including use and installation, may be
 found in the docs/ directory.  See documentation.txt or
 documentation.html for instructions on installing mod_dtcl.
+
+As of version 0.9.4, dtcl now uses <? ?> tags instead of <+ +>.  The
+newtags.sh shell script in the contrib/ directory will update your
+.ttml files for you.  For now, mod_dtcl contains compatibility code so
+that your old scripts will still run.

@@ -320,8 +320,8 @@
 	  share variables, and most importantly, loaded modules,
 	  from a common parent (such as one of the InitScripts).
 	  When a file is loaded, it is transformed into a Tcl
-	  script by putting everything outside of &lt;+ and
-	  +&gt; into large hputs statements.  When the script is
+	  script by putting everything outside of &lt;? and
+	  ?&gt; into large hputs statements.  When the script is
 	  complete, it is then inserted into the cache, for
 	  future use.  In fact, if the file modification
 	  information doesn't change, mod_dtcl will execute the
@@ -333,8 +333,23 @@
 	  images, or loading binary data with 'include'.
 	</li>
       </ul>
-      
-      <h3>5) Getting Help</h3>
+
+      <h3>5) Upgrading From Older (< 0.9.3) Versions</h3>
+      <ul>
+	<li><b>New tags</b><br> As of version 0.9.4, mod_dtcl uses
+	  &lt;? and ?&gt; instead of &lt;+ and +&gt; to delimit
+	  sections of Tcl code.  By default, dtcl is still compiled
+	  with code to parse the &lt;?  ?&gt; tags, but it will run
+	  faster if <code>USE_OLD_TAGS</code> is set to 0 in
+	  <code>mod_dtcl.h</code>.  You can automatically change your
+	  .ttml files to the new format by using the
+	  <code>newtags.sh</code> script in the contrib/ directory.
+	  Run it at the top level of your DocumentRoot.
+
+	</li>
+      </ul>
+
+      <h3>6) Getting Help</h3>
       <ul>
 	<li><b>Mailing list</b><br>
 	  <p>

@@ -22,7 +22,7 @@ These are some examples, rather limited ones, of what can be done with mod_dtcl.
 <tr><td><hr><b>Hello world</b></td></tr>
 <tr><td bgcolor=gray><pre>
 
-&lt;+
+&lt;?
 headers setcookie "foo" "bar" # we have to put this before any 'hputs' statements
 
 # once buffering is switched off, it is no longer possible to
@@ -30,7 +30,7 @@ headers setcookie "foo" "bar" # we have to put this before any 'hputs' statement
 buffered off
 
 hputs "Hello world"
-+&gt;
+?&gt;
 
 </pre>
 	  </td></tr>
@@ -39,7 +39,7 @@ hputs "Hello world"
 Produces:
 <p>
 
-<+
+<?
 headers setcookie "foo" "bar"
 
 # once buffering is switched off, it is no longer possible to
@@ -47,7 +47,7 @@ headers setcookie "foo" "bar"
 buffered off
 
 hputs "hello world" 
-+>
+?>
 
 <p>
 
@@ -60,11 +60,11 @@ hputs "hello world"
 
 <tr><td bgcolor=gray><pre>
 
-&lt;+ if { 1 } { +&gt;
+&lt;? if { 1 } { ?&gt;
 
 &lt;h2&gt; True &lt;/h2&gt;
 
-&lt;+ }  +&gt;
+&lt;? }  ?&gt;
 
 </td></tr></pre>
 
@@ -72,11 +72,11 @@ hputs "hello world"
 Produces:
 <p>
 
-<+ if { 1 } { +>
+<? if { 1 } { ?>
 
 <h2> True </h2>
 
-<+ } +>
+<? } ?>
 </td></tr>
 
 <tr><td><hr><b>Loops:</b>
@@ -84,36 +84,36 @@ Produces:
 
 <tr><td bgcolor=gray><pre>
 
-&lt;+ 
+&lt;? 
 set x 0 
 while { $x &lt; 5 } { 
  hputs "\$x = $x&lt;br>"
  incr x
-+&gt;
+?&gt;
 
 LOOP&lt;br>
 
-&lt;+ }  +&gt;
+&lt;? }  ?&gt;
 
 </pre>
 </td></tr>
 
 <tr><td>Produces:<p>
-<+
+<?
 set x 0
 while { $x < 5 } { 
  hputs "\$x = $x<br>"
  incr x
-+>
+?>
 LOOP<BR>
-<+ } +>
+<? } ?>
 </td></tr>
 
 <tr><td><hr><b>Variables (environmental as well as those passed to the script)</b><p>
 </td></tr>
 <tr><td bgcolor=gray><pre>
 
-&lt;+ 
+&lt;? 
  hgetvars
 if { [ array exists VARS ] } {
     hputs "&lt; ul>"
@@ -141,13 +141,13 @@ if { [ array exists COOKIES ] } {
     hputs "&lt;/ul>"
 }
 
-+&gt;
+?&gt;
 
 </pre>
 </td></tr>
 
 <tr><td>Produces:<p>
-<+
+<?
 hgetvars
 if { [ array exists VARS ] } {
     hputs "<ul>"
@@ -174,14 +174,14 @@ if { [ array exists COOKIES ] } {
     hputs "</ul>"
 }
 
-+>
+?>
 </td></tr>
 
 <tr><td><hr><b>Create a table on the fly</b><p>
 </td></tr>
 <tr><td bgcolor=gray><pre>
 
-&lt;+
+&lt;?
 set i 1
 hputs "&lt;table&gt;\n"
 
@@ -196,12 +196,12 @@ while { $i &lt;= 8 } {
 }
 
 hputs "&lt;/table&gt;\n"
-+&gt;
+?&gt;
 </pre>
 </td></tr>
 
 <tr><td>Produces:<p>
-<+
+<?
 set i 1
 hputs "<table>\n"
 
@@ -216,7 +216,7 @@ while { $i <= 8 } {
 }
 
 hputs "</table>\n"
-+>
+?>
 </td></tr>
 
 <tr><td><hr> <b>In addition</b><br> 
@@ -231,7 +231,7 @@ if everything is compiled right, load tcl modules, like libpgtcl.so
 
 </table>
 
-<+ dtcl_info +>
+<? dtcl_info ?>
 
 
 <p>

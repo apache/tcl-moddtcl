@@ -6,6 +6,7 @@ Standards-Version: 2.5.0
 
 Package: libapache-mod-dtcl
 Architecture: any
+Build-Depends: tcl8.3-dev, apache-dev
 Depends: ${shlibs:Depends}, apache-common (>= 1.3.6)
 Description: Server side Tcl scripting for Apache
  The mod_dtcl Apache module enables the use of Tcl as an HTML-embedded

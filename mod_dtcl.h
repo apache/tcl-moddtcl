@@ -19,16 +19,26 @@
 #define THREADED_TCL 0 /* Unless you have MINGW32, modify this one! */
 #endif
 
+/* If you want to show the mod_dtcl version, you can define this to 0.
+   Otherwise, set this to 1 to hide the version from potential
+   troublemakers.  */
+#define HIDE_DTCL_VERSION 1
+
 /* Turn on the translation stuff.  This will translate things to UTF
    correctly.  Turn off *only* if you will *not* use anything but
    plain ascii */
-
 #define DTCL_I18N 1
+
+/* Allow <+ +> tags for backwards compatibility.  Use the
+   mod_dtcl/contrib/newtags.sh script to update your .ttml files to
+   use <? ?> tags. */
+#define USE_OLD_TAGS 1 
 
 /* End Configuration options  */
 
-#define STARTING_SEQUENCE "<+"
-#define ENDING_SEQUENCE "+>"
+#define STARTING_SEQUENCE "<?"
+#define ENDING_SEQUENCE "?>"
+
 #define DEFAULT_ERROR_MSG "[an error occurred while processing this directive]"
 #define DEFAULT_TIME_FORMAT "%A, %d-%b-%Y %H:%M:%S %Z"
 #define DEFAULT_HEADER_TYPE "text/html"
