@@ -16,11 +16,7 @@
 /* If you do not have a threaded Tcl, you can define this to 0.  This
    has the effect of running Tcl Init code in the main parent init
    handler, instead of in child init handlers. */
-#ifdef __MINGW32__
-#define THREADED_TCL 1
-#else
-#define THREADED_TCL 0 /* Unless you have MINGW32, modify this one! */
-#endif
+#define THREADED_TCL 0
 
 /* If you want all 'environmental' variables to be accessed through
    the ENVS array, set this to 1.  Note that this could be a security

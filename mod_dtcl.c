@@ -95,6 +95,14 @@ static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r
 /* just need some arbitrary non-NULL pointer which can't also be a request_rec */
 #define NESTED_INCLUDE_MAGIC	(&dtcl_module)
 
+/* Just a flag to let us know that the module has already been loaded once -
+   see tcl_init_stuff for details */
+static int already_loaded=0;
+
+#ifdef THREADED_TCL 
+static Tcl_Condition *sendMutex;
+#endif /* THREADED_TCL */
+
 /* Set up the content type header */
 
 int set_header_type(request_rec *r, char *header)
@@ -431,11 +439,16 @@ static int send_content(request_rec *r)
     char timefmt[MAX_STRING_LEN];
 
     int errstatus;
+	int retval;
 
     Tcl_Interp *interp;
 
     dtcl_interp_globals *globals = NULL;
     dtcl_server_conf *dsc = NULL;
+
+#ifdef THREADED_TCL
+	Tcl_MutexLock(sendMutex);
+#endif /* THREADED_TCL */
     dsc = dtcl_get_conf(r);
     globals = ap_pcalloc(r->pool, sizeof(dtcl_interp_globals));
     globals->r = r;
@@ -445,7 +458,10 @@ static int send_content(request_rec *r)
     r->allowed |= (1 << M_GET);
     r->allowed |= (1 << M_POST);
     if (r->method_number != M_GET && r->method_number != M_POST)
-	return DECLINED;
+	{
+	retval = DECLINED;
+	goto cleanup;
+	}
 
     if (r->finfo.st_mode == 0)
     {
@@ -454,11 +470,15 @@ static int send_content(request_rec *r)
 		     (r->path_info
 		      ? ap_pstrcat(r->pool, r->filename, r->path_info, NULL)
 		      : r->filename));
-	return HTTP_NOT_FOUND;
+	retval = HTTP_NOT_FOUND;
+	goto cleanup;
     }
 
     if ((errstatus = ap_meets_conditions(r)) != OK)
-	return errstatus;
+	{
+	retval = errstatus;
+	goto cleanup;
+	}
 
     /* We need to send it as html */
     /*     r->content_type = DEFAULT_HEADER_TYPE;  */
@@ -477,7 +497,8 @@ static int send_content(request_rec *r)
     if (Tcl_EvalObj(interp, dsc->namespacePrologue) == TCL_ERROR)
     {
 	ap_log_error(APLOG_MARK, APLOG_ERR, r->server, "Could not create request namespace\n");
-	return HTTP_BAD_REQUEST;
+	retval = HTTP_BAD_REQUEST;
+	goto cleanup;
     }
 
     /* Apache Request stuff */
@@ -496,7 +517,10 @@ static int send_content(request_rec *r)
 #endif
 
     if ((errstatus = ApacheRequest___parse(globals->req)) != OK)
-	return errstatus;
+	{
+	retval = errstatus;
+	goto cleanup;
+	}
 
     /* take results and create tcl variables from them */
 #if USE_ONLY_VAR_COMMAND == 0
@@ -569,16 +593,9 @@ static int send_content(request_rec *r)
 	}
 	if (!upload_files_to_var)
 	{
-	    if (ApacheUpload_FILE(upload) != NULL)
+	    if (upload->fp != NULL)
 	    {
-#ifdef __MINGW32__
-		chan = Tcl_MakeFileChannel(
-		    (ClientData)_get_osfhandle(
-			fileno(ApacheUpload_FILE(upload))), TCL_READABLE);
-#else
-		chan = Tcl_MakeFileChannel(
-		    (ClientData)fileno(ApacheUpload_FILE(upload)), TCL_READABLE);
-#endif
+		chan = Tcl_MakeFileChannel((ClientData)fileno(upload->fp), TCL_READABLE);
 		Tcl_RegisterChannel(interp, chan);
 		channelname = Tcl_GetChannelName(chan);
 		Tcl_ObjSetVar2(interp,
@@ -594,6 +611,7 @@ static int send_content(request_rec *r)
 #endif /* USE_ONLY_UPLOAD_COMMAND == 1 */
 
     get_parse_exec_file(r, dsc, r->filename, 1);
+	retval = OK;
     /* reset globals  */
 cleanup:
     *(dsc->buffer_output) = 0;
@@ -601,7 +619,11 @@ cleanup:
     *(dsc->headers_set) = 0;
     *(dsc->content_sent) = 0;
 
-    return OK;
+#ifdef THREADED_TCL
+	Tcl_MutexUnlock(sendMutex);
+#endif /* THREADED_TCL */
+
+    return retval;
 }
 
 /* This is done in two places, so I decided to group the creates in
@@ -632,8 +654,17 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     dtcl_server_conf *dsc = (dtcl_server_conf *)
 	ap_get_module_config(s->module_config, &dtcl_module);
     server_rec *sr;
-    /* Initialize TCL stuff  */
 
+    /* Apache actually loads all the modules twice, just to see if it
+     * can. This is a pain, because things don't seem to get
+     * completely cleaned up on the Tcl side. So this little hack
+     * should make us *really* load only the first time around. */
+
+	if (already_loaded > 0)
+		return;
+	already_loaded++;
+
+    /* Initialize TCL stuff  */
     Tcl_FindExecutable(NULL);
     interp = Tcl_CreateInterp();
     dsc->server_interp = interp; /* root interpreter */
@@ -728,6 +759,7 @@ MODULE_VAR_EXPORT void dtcl_init_handler(server_rec *s, pool *p)
 #if THREADED_TCL == 0
     tcl_init_stuff(s, p);
 #endif
+#undef HIDE_DTCL_VERSION
 #ifndef HIDE_DTCL_VERSION
     ap_add_version_component("mod_dtcl/"DTCL_VERSION);
 #else

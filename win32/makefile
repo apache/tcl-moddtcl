@@ -12,24 +12,27 @@
 # 
 # Command line options differ for different versions of gcc
 #
-# GCC 2.x
-# NATIVESTRUCT ?= -fnative-struct
+#GCCVER = 2
 #
-# GCC 3.x
-NATIVESTRUCT ?= -mms-bitfields
+GCCVER = 3
 
 #
-# Experemental threaded flag - set this and mod_dtcl will link against a 
-# threaded version of Tcl
+# Threaded flag - set this and mod_dtcl will link against a 
+# threaded version of Tcl.  You MUST build a threaded version of Tcl for
+# this to work - ActiveState's binary Tcl distribution does not include 
+# threads!
 #
-# THREADED =t
+# This overrides the THREADED_TCL flag in mod_dtcl.h !
 #
-# XXX - not ready yet :)
-THREADED ?=
+#THREADED ?= YES
+#
+# 
+THREADED ?= NO
 
 #
 # I use this as a pointer to a good temporary location. 
-# The default works for most people
+# The default works for most people.  You won't need any of the cruft
+# we create while building.
 #
 TEMP_LIBS ?= C:/TEMP
 
@@ -70,41 +73,40 @@ APACHE_INC ?= -I $(APACHE_SRC)/src/include -I $(APACHE_SRC)/src/os/win32
 
 
 #
-# Set APACHE_LIB and APACHE_DEF to where you'd like a MingW32 compatible
-# APACHE library file and DLL DEF file put.  You normally only need these
-# during a build, so a temporary location is OK
-#
-APACHE_LIB ?= $(TEMP_LIBS) 
-APACHE_DEF ?= $(TEMP_LIBS)/ApacheCore.def
-
-#
 # You shouldn't have to change anything below this
 #
 ROOT_DIR = ../
+OUTPUT_DIR = ./output
 TCL_INC = -I $(TCL_HOME)/include
-TCL_LIB = $(TCL_HOME)/lib
+APACHE_LIB ?= $(TEMP_LIBS) 
+APACHE_DEF ?= $(TEMP_LIBS)/ApacheCore.def
 
-CFLAGS = -O3 $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\""
+ifeq ($(GCCVER), 3)
+NATIVESTRUCT ?= -mms-bitfields
+else
+NATIVESTRUCT ?= -fnative-struct
+endif
+
+ifeq ($(THREADED), YES)
+TCL_LIB = $(TCL_HOME)/lib/tcl$(TCL_VERSION)t.lib
+CFLAGS = $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\"" -DTHREADED_TCL=1
+else
+TCL_LIB = $(TCL_HOME)/lib/tcl$(TCL_VERSION).lib
+CFLAGS = $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\""
+endif
+
 
 CC = gcc $(CFLAGS)
-
+LIBS = $(TCL_LIB) -L$(APACHE_LIB) -lapachecore
 INCLUDES = $(TCL_INC) $(APACHE_INC)
-LIBS = $(TCL_LIB)/tcl$(TCL_VERSION)$(THREADED).lib -L$(APACHE_LIB) -lapachecore 
 
 APREQ_OBJECTS = apache_cookie.o apache_multipart_buffer.o apache_request.o
 OBJECTS = tcl_commands.o parser.o channel.o $(APREQ_OBJECTS)
 
 DLL_CFLAGS = -DEAPI=1
-
-DLL_EXP_LIB = libmod_dtcl.a
-DLL_EXP_DEF = mod_dtcl.def
 DLL_DYNAMIC = ApacheModuleDtcl.dll 
 DLL_SO	= mod_dtcl.so
 DLL_OBJS = mod_dtcl.o $(OBJECTS) 
-
-DLLWRAP_FLAGS = --def $(DLL_EXP_DEF) \
-	--implib $(DLL_EXP_LIB) \
-	--driver-name $(CC)
 
 #
 # By default we build a .so file (Apache > 1.3.14)
@@ -128,17 +130,20 @@ so_style:	APACHE_EXP=$(APACHE_SRC)/src/Release/ApacheCore.exp
 so_style:	DLL_BUILD=$(DLL_SO)	
 so_style:	apache_libs $(DLL_SO)
 
-$(DLL_DYNAMIC):	$(DLL_OBJS) makefile
+$(DLL_DYNAMIC):	$(OUTPUT_DIR) $(DLL_OBJS) makefile 
 	$(CC) --dll --kill-at --disable-stdcall-fixup \
-		-o $(DLL_DYNAMIC) $(DLL_OBJS) $(LIBS)
+	$(DLL_OBJS) $(LIBS) -o $(OUTPUT_DIR)/$(DLL_DYNAMIC)
 
 # 
 # This does the same thing as the above, yet names the output file
 # with a .so extension to match the "new" Apache style.
 #
-$(DLL_SO):	$(DLL_OBJS) makefile
+$(DLL_SO):	$(OUTPUT_DIR) $(DLL_OBJS) makefile
 	$(CC) --dll --kill-at --disable-stdcall-fixup \
-		-o $(DLL_SO) $(DLL_OBJS) $(LIBS)
+	$(DLL_OBJS) $(LIBS) -o $(OUTPUT_DIR)/$(DLL_SO)
+
+$(OUTPUT_DIR):
+	-@mkdir $(OUTPUT_DIR)
 
 apache_cookie.o: $(ROOT_DIR)apache_cookie.c $(ROOT_DIR)apache_cookie.h
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
@@ -156,11 +161,12 @@ channel.o: $(ROOT_DIR)channel.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)channel.h
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
 
 clean:
-	-@rm -f $(DLL_OBJS) $(DLL_DYNAMIC) $(DLL_SO) $(DLL_EXP_LIB)
+	-@rm -f $(DLL_OBJS) $(DLL_DYNAMIC) $(DLL_SO) 
+	-@rm -rf $(OUTPUT_DIR)
 
-install: $(DLL_BUILD) $(DLL_EXP_LIB)
-	echo Installing mod_dtcl...
-	-cp $(DLL_BUILD) $(APACHE_HOME)/modules
+install: 
+	@echo Installing mod_dtcl...
+	-@cp $(OUTPUT_DIR)/* $(APACHE_HOME)/modules
 
 apache_libs:
 	-@mkdir $(TEMP_LIBS)
