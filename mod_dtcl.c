@@ -87,6 +87,8 @@ static void tcl_init_stuff(server_rec *s, pool *p);
 static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf *newdsc);
 static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc,
 			 Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf);
+static int get_tcl_file(request_rec *r, dtcl_server_conf *dsc, 
+			Tcl_Interp *interp, char *filename, Tcl_Obj *outbuf);
 static int send_content(request_rec *);
 static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
 
@@ -208,15 +210,12 @@ int dtcl_upload_hook(void *ptr, char *buf, int len, ApacheUpload *upload)
 
 /* Load, cache and eval a Tcl file  */
 
-static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_Obj *outbuf)
+static int get_tcl_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, Tcl_Obj *outbuf)
 {
     int result = 0;
-#if 1
     /* Taken, in part, from tclIOUtil.c out of the Tcl
        distribution, and modified */
 
-    /* Basically, what we are doing here is a Tcl_EvalFile, but
-       with the addition of caching code. */
     Tcl_Channel chan = Tcl_OpenFileChannel(interp, r->filename, "r", 0644);
     if (chan == (Tcl_Channel) NULL)
     {
@@ -226,7 +225,12 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 	return TCL_ERROR;
     }
 
+    if (dsc->dtcl_before_script) 
+	Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
     result = Tcl_ReadChars(chan, outbuf, r->finfo.st_size, 1);
+    if (dsc->dtcl_after_script) 
+	Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
+
     if (result < 0)
     {
 	Tcl_Close(interp, chan);
@@ -239,9 +243,6 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 	return TCL_ERROR;
 
     return TCL_OK;
-#else
-    Tcl_EvalFile(interp, r->filename);
-#endif /* 1 */
 }
 
 /* Parse and execute a ttml file */
@@ -395,7 +396,7 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, char *filename, i
 	    result = get_ttml_file(r, dsc, interp, filename, toplevel, outbuf);
 	} else {
 	    /* It's a plain Tcl file */
-	    result = get_tcl_file(r, interp, filename, outbuf);
+	    result = get_tcl_file(r, dsc, interp, filename, outbuf);
 	}
 	if (result != TCL_OK)
 	    return result;
