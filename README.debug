@@ -1,0 +1,27 @@
+How to debug problems in mod_dtcl:
+
+First, try looking in your error logs.  Often times the problem can be
+found there.  Or, if you are getting a funny page, look in the page
+sources to make sure mod_dtcl isn't returning an error that is being
+hidden by some HTML.
+
+Second, you can try running a system call tracer on Apache/mod_dtcl.
+On Linux, this is 'strace', on FreeBSD, ktrace.  Run it like this,
+after Apache has been stopped: "strace -o outputfile apache -X".  That
+should give you some information about what's going on.
+
+If it's not enough, compile apache/mod_dtcl with the debugging flag
+set (-g with gcc), and run it like so:
+
+(assuming that you have a system with the GNU debugger, gdb)
+gdb apache
+> run -X
+...
+crash or whatever
+> bt # does a stack trace
+
+These are things that are useful to post to the mailing list (if
+they're not too big), or send to the author(s).  They are also good
+ways of learning about what's going on 'behind the scenes'.
+
+- davidw
