@@ -1009,7 +1009,6 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		/* send to file, or stick in variable */
 		if (upload_files_to_var != 0)
 		{
-		    fprintf(stderr, "data dumped to var\n");
 		    Tcl_ObjSetVar2(interp, 
 				   Tcl_NewStringObj("::request::UPLOAD", -1), 
 				   Tcl_NewStringObj("data", -1), 
@@ -1159,7 +1158,6 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		acum = dtcl_memcat(acum, acumlen, baseptr, buflen);
 	    
 	    acumlen += buflen;
-	    fprintf(stderr, "acumlen: %d\n", acumlen);
 	}
 	buflen = 0;
 	free(buffer);
