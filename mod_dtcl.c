@@ -591,7 +591,7 @@ static int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_O
     int len;
     if (objc < 2)
     {
-	Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
+	Tcl_WrongNumArgs(interp, 1, objv, "string");
 	return TCL_ERROR;
     }
     arg1 = Tcl_GetByteArrayFromObj(objv[1], &len);
@@ -622,21 +622,22 @@ static int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *C
 	    Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
 	    return TCL_ERROR;
 	}
-	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, global_rr->server, "Mod_Dtcl Error: %s", Tcl_GetStringFromObj (objv[2], (int *)NULL));
+	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 
+		     global_rr->server, "Mod_Dtcl Error: %s", 
+		     Tcl_GetStringFromObj (objv[2], (int *)NULL));
     } else {
 	if (objc != 2)
 	{
 	    Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
 	    return TCL_ERROR;
 	}
-    }
-
-    if (buffer_output == 1)
-    {
-	memwrite(&obuffer, arg1, length);
-    } else {
-	flush_output_buffer(global_rr);
-	ap_rwrite(arg1, length, global_rr);
+	if (buffer_output == 1)
+	{
+	    memwrite(&obuffer, arg1, length);
+	} else {
+	    flush_output_buffer(global_rr);
+	    ap_rwrite(arg1, length, global_rr);
+	}
     }
 
     return TCL_OK;
@@ -736,6 +737,19 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 	    return TCL_ERROR;
 	}
 	set_header_type(global_rr, Tcl_GetStringFromObj(objv[2], (int *)NULL));
+    } else if (!strcmp("numeric", opt)) /* ### numeric ### */
+    {
+	int st = 200;
+
+	if (objc != 3)
+	{
+	    Tcl_WrongNumArgs(interp, 1, objv, "numeric response code");
+	    return TCL_ERROR;
+	}
+	if (Tcl_GetIntFromObj(interp, objv[2], &st) != TCL_ERROR)
+	    global_rr->status = st;
+	else
+	    return TCL_ERROR;
     } else {
 	// XXX	Tcl_WrongNumArgs(interp, 1, objv, "headers option arg ?arg ...?");
 	return TCL_ERROR;
@@ -791,6 +805,7 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     struct passwd *pw;
 #endif /* ndef WIN32 */
     char *t;
+    char *authorization = NULL;
 
     time_t date = global_rr->request_time;
 
@@ -815,6 +830,27 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     
     env_arr =  ap_table_elts(global_rr->subprocess_env);
     env     = (table_entry *) env_arr->elts;
+
+    /* Get the user/pass info for Basic authentication */
+    (const char*)authorization = ap_table_get(global_rr->headers_in, "Authorization");
+    if (authorization && !strcasecmp(ap_getword_nc(global_rr->pool, &authorization, ' '), "Basic"))
+    {
+	char *tmp;
+	char *user;
+	char *pass;
+
+	tmp = ap_pbase64decode(global_rr->pool, authorization);
+	user = ap_getword_nulls_nc(global_rr->pool, &tmp, ':');
+	pass = tmp;
+ 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1), 
+		       Tcl_NewStringObj("user", -1),
+		       STRING_TO_UTF_TO_OBJ(user),
+		       0);  
+ 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1), 
+		       Tcl_NewStringObj("pass", -1),
+		       STRING_TO_UTF_TO_OBJ(pass),
+		       0);  
+    } 
 
     /* These were the "include vars"  */
     Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 0)), 0);

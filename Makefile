@@ -24,8 +24,10 @@ all: builddtcl_test lib shlib
 static: lib
 lib: $(STATICLIB)
 
-.c.a:
+.c.o:  
 	$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) -DDTCL_VERSION=\"`cat VERSION`\" $<
+
+.o.a:
 	ar cr $(STATICLIB) $*.o
 
 shared: shlib
@@ -33,8 +35,8 @@ shlib: $(SHLIB)
 
 .SUFFIXES: .so .a
 
-.c.so:
-	$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) $(CFLAGS_SHLIB) -DDTCL_VERSION=\"`cat VERSION`\" $< && mv $*.o $*-so.o
+.o.so:
+	mv $*.o $*-so.o
 	$(LD) $(LDFLAGS_SHLIB) -o $@ $*-so.o $(TCL_LIB)
 
 clean: 
