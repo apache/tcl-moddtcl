@@ -132,6 +132,7 @@ typedef struct {
     Tcl_Obj *dtcl_child_exit_script;
     Tcl_Obj *dtcl_before_script;        /* script run before each page */
     Tcl_Obj *dtcl_after_script;         /*            after            */
+    Tcl_Obj *dtcl_error_script;         /*            after            */
     int dtcl_cache_size;
     char *server_name; 
 } dtcl_server_conf;
@@ -636,14 +637,19 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 #endif
 
     if (Tcl_EvalObj(interp, outbuf) == TCL_ERROR)
-    {
+    {	
 	print_headers(global_rr);
 	flush_output_buffer(global_rr);
-	errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
-	print_error(r, 0, errorinfo);
-	print_error(r, 1, "<p><b>OUTPUT BUFFER:</b></p>");
-	print_error(r, 0, Tcl_GetStringFromObj(outbuf, (int *)NULL));
-		    
+	if (dsc->dtcl_error_script) 
+	{
+	    Tcl_EvalObj(interp, dsc->dtcl_error_script);
+	} else {
+	    /* default action  */
+	    errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
+	    print_error(r, 0, errorinfo);
+	    print_error(r, 1, "<p><b>OUTPUT BUFFER:</b></p>");
+	    print_error(r, 0, Tcl_GetStringFromObj(outbuf, (int *)NULL));
+	}    
 /* 		    "</pre><b>OUTPUT BUFFER</b><pre>\n",
 		    Tcl_GetStringFromObj(outbuf, (int *)NULL));  */
     } else {
@@ -883,16 +889,20 @@ void tcl_init_stuff(server_rec *s, pool *p)
 			 Tcl_GetVar(interp, "errorInfo", 0));
 	}
     }
-    if (dsc->dtcl_cache_size != 0)
+
+    /* This is what happens if it is not set by the user */
+    if(dsc->dtcl_cache_size < 0) 
     {
-	cacheSize = dsc->dtcl_cache_size;
-	cacheFreeSize = dsc->dtcl_cache_size;
-    } else {
 	if (ap_max_requests_per_child != 0)
 	    cacheSize = ap_max_requests_per_child / 2;
 	else
 	    cacheSize = 10; /* Arbitrary number FIXME */
 	cacheFreeSize = cacheSize;
+    } else if (dsc->dtcl_cache_size > 0) {
+	cacheSize = dsc->dtcl_cache_size;
+	cacheFreeSize = dsc->dtcl_cache_size;
+    } else {
+	cacheSize = 0;
     }
     /* Initializing cache structures */
     objCacheList = malloc(cacheSize * sizeof(char *));
@@ -950,6 +960,8 @@ const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)
 	dsc->dtcl_before_script = objarg;
     } else if (strcmp(arg, "AfterScript") == 0) {
 	dsc->dtcl_after_script = objarg;
+    } else if (strcmp(arg, "ErrorScript") == 0) {
+	dsc->dtcl_error_script = objarg;
     } else {
 	return "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript";
     }
@@ -989,7 +1001,8 @@ void *create_dtcl_config(pool *p, server_rec *s)
     dsc->dtcl_child_exit_script = NULL;
     dsc->dtcl_before_script = NULL;
     dsc->dtcl_after_script = NULL;
-    dsc->dtcl_cache_size = 0;
+    dsc->dtcl_error_script = NULL;
+    dsc->dtcl_cache_size = -1;
     dsc->server_name = ap_pstrdup(p, s->server_hostname);
     return dsc;
 }
@@ -1006,6 +1019,7 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ? overrides->dtcl_child_exit_script : base->dtcl_child_exit_script;
     dsc->dtcl_before_script = overrides->dtcl_before_script ? overrides->dtcl_before_script : base->dtcl_before_script;
     dsc->dtcl_after_script = overrides->dtcl_after_script ? overrides->dtcl_after_script : base->dtcl_after_script;
+    dsc->dtcl_error_script = overrides->dtcl_error_script ? overrides->dtcl_error_script : base->dtcl_error_script;
     dsc->dtcl_cache_size = overrides->dtcl_cache_size ? overrides->dtcl_cache_size : base->dtcl_cache_size;
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name; 
     return dsc;
@@ -1051,7 +1065,7 @@ const handler_rec dtcl_handlers[] =
 
 const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript scriptname.tcl"},
+    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript scriptname.tcl"},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
     {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},

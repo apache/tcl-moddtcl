@@ -34,7 +34,7 @@ if [ -d $APACHE ]
     then
     echo "Apache in $APACHE"
     else
-    echo "Apache NOT in $Apache, please edit builddtcl.sh"
+    echo "Apache NOT in $APACHE, please edit builddtcl.sh"
     exit 1
 fi
 
