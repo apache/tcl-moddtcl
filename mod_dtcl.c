@@ -82,18 +82,10 @@
 /* *** Global variables *** */
 Tcl_Encoding system_encoding;    /* Default encoding  */
 
-/* output buffer for initial buffer_add. We use traditional memory
-   management stuff on obuff - malloc, free, etc., because I couldn't
-   get it to work well with the apache functions - davidw */
-
-
 module MODULE_VAR_EXPORT dtcl_module;
 
-//dtcl_interp_globals globals;
-
-#define GETREQINTERP(req) ((dtcl_server_conf *)ap_get_module_config(req->server->module_config, &dtcl_module))->server_interp
-
 static void tcl_init_stuff(server_rec *s, pool *p);
+static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf *newdsc);
 static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf);
 static int send_content(request_rec *);
 static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
@@ -578,7 +570,7 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
 
     Tcl_Obj *outbuf = NULL;
     Tcl_HashEntry *entry = NULL;
-    Tcl_Interp *interp = GETREQINTERP(r);
+    Tcl_Interp *interp = dsc->server_interp;
 
     /* Look for the script's compiled version. If it's not found,
        create it. */
@@ -637,11 +629,10 @@ static int send_content(request_rec *r)
     
     dtcl_interp_globals *globals = NULL;
     dtcl_server_conf *dsc = NULL;
-
     dsc = dtcl_get_conf(r);
     globals = ap_pcalloc(r->pool, sizeof(dtcl_interp_globals));
     globals->r = r;
-    interp = GETREQINTERP(r);
+    interp = dsc->server_interp;
     Tcl_SetAssocData(interp, "dtcl", NULL, globals);
 
     r->allowed |= (1 << M_GET);
@@ -893,9 +884,18 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     sr = s;
     while (sr)
     {
+	dtcl_server_conf *mydsc = NULL;
 	/* This should set up slave interpreters for other virtual
            hosts */
-	dtcl_server_conf *mydsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
+	if (sr != s) /* not the first one  */
+	{
+	    mydsc = ap_pcalloc(p, sizeof(dtcl_server_conf));	    
+	    ap_set_module_config(sr->module_config, &dtcl_module, mydsc);
+	    copy_dtcl_config(p, dsc, mydsc);
+	    mydsc->server_interp = NULL;
+	} else {
+	    mydsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
+	}
 	if (!mydsc->server_interp)
 	{
 	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
@@ -903,6 +903,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
 	    Tcl_RegisterChannel(mydsc->server_interp, achan);
 	}
+
 	mydsc->server_name = ap_pstrdup(p, sr->server_hostname);
 	sr = sr->next;
     }
@@ -994,54 +995,81 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
 {
     dtcl_server_conf *newconfig = NULL;
     dtcl_server_conf *dsc = NULL; /* server config */
-    dtcl_server_conf *ddc = NULL; /* directory config */
     void *dconf = r->per_dir_config;
 
     dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
-
     if (dconf != NULL)
     {
+	dtcl_server_conf *ddc = (dtcl_server_conf *) 
+	    ap_get_module_config(dconf, &dtcl_module); /* per directory config */
+
 	newconfig = (dtcl_server_conf *) ap_pcalloc(r->pool, sizeof(dtcl_server_conf));
-	ddc = (dtcl_server_conf *) ap_get_module_config(dconf, &dtcl_module);
 	newconfig->server_interp = dsc->server_interp;
+	copy_dtcl_config(r->pool, dsc, newconfig);
+	/* list here things that can be per-directory  */
 	newconfig->dtcl_before_script = ddc->dtcl_before_script ? ddc->dtcl_before_script : dsc->dtcl_before_script;
 	newconfig->dtcl_after_script = ddc->dtcl_after_script ? ddc->dtcl_after_script : dsc->dtcl_after_script;
 	newconfig->dtcl_error_script = ddc->dtcl_error_script ? ddc->dtcl_error_script : dsc->dtcl_error_script;
-	newconfig->cache_size = dsc->cache_size;
-	newconfig->cache_free = dsc->cache_free;
-	newconfig->objCacheList = dsc->objCacheList;
-	newconfig->objCache = dsc->objCache;
-	newconfig->namespacePrologue = dsc->namespacePrologue;
-	
-	newconfig->buffer_output = dsc->buffer_output;
-	newconfig->headers_printed = dsc->headers_printed;
-	newconfig->headers_set = dsc->headers_set;
-	newconfig->content_sent = dsc->content_sent;
-	newconfig->obuffer = dsc->obuffer;
-
 	return newconfig;
     }
-    return dsc;
+    return dsc; /* if there is no per dir config, just return the
+                   server config */
+}
+
+static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf *newdsc)
+{
+    newdsc->server_interp = olddsc->server_interp;
+    newdsc->dtcl_global_init_script = olddsc->dtcl_global_init_script;
+    newdsc->dtcl_child_init_script = olddsc->dtcl_child_init_script;
+    newdsc->dtcl_child_exit_script = olddsc->dtcl_child_exit_script;
+    newdsc->dtcl_before_script = olddsc->dtcl_before_script;
+    newdsc->dtcl_after_script = olddsc->dtcl_after_script;
+    newdsc->dtcl_error_script = olddsc->dtcl_error_script;
+
+    /* these are pointers so that they can be passed around...  */
+    newdsc->cache_size = olddsc->cache_size;
+    newdsc->cache_free = olddsc->cache_free;
+    newdsc->cache_size = olddsc->cache_size;
+    newdsc->cache_free = olddsc->cache_free;
+    newdsc->upload_max = olddsc->upload_max;
+    newdsc->upload_files_to_var = olddsc->upload_files_to_var;
+    newdsc->server_name = olddsc->server_name;
+    newdsc->upload_dir = olddsc->upload_dir;
+    newdsc->objCacheList = olddsc->objCacheList;
+    newdsc->objCache = olddsc->objCache;
+    newdsc->namespacePrologue = olddsc->namespacePrologue;
+
+    newdsc->buffer_output = olddsc->buffer_output;
+    newdsc->headers_printed = olddsc->headers_printed;
+    newdsc->headers_set = olddsc->headers_set;
+    newdsc->content_sent = olddsc->content_sent;
+    newdsc->buffer_output = olddsc->buffer_output;
+    newdsc->headers_printed = olddsc->headers_printed;
+    newdsc->headers_set = olddsc->headers_set;
+    newdsc->content_sent = olddsc->content_sent;
+    newdsc->obuffer = olddsc->obuffer;
 }
 
 static void *create_dtcl_config(pool *p, server_rec *s)
 {
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
 
+    dsc->server_interp = NULL;
     dsc->dtcl_global_init_script = NULL;
     dsc->dtcl_child_init_script = NULL;
     dsc->dtcl_child_exit_script = NULL;
     dsc->dtcl_before_script = NULL;
     dsc->dtcl_after_script = NULL;
     dsc->dtcl_error_script = NULL;
-    
+
     /* these are pointers so that they can be passed around...  */
     dsc->cache_size = ap_pcalloc(p, sizeof(int));
     dsc->cache_free = ap_pcalloc(p, sizeof(int));
     *(dsc->cache_size) = -1;
     *(dsc->cache_free) = 0;
     dsc->upload_max = 0;
-    dsc->server_name = ap_pstrdup(p, s->server_hostname);
+    dsc->upload_files_to_var = 0;
+    dsc->server_name = NULL;
     dsc->upload_dir = "/tmp";
     dsc->objCacheList = NULL;
     dsc->objCache = ap_pcalloc(p, sizeof(Tcl_HashTable));
@@ -1092,6 +1120,7 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;  */
     dsc->upload_max = overrides->upload_max ? overrides->upload_max : base->upload_max;
 /*     dsc->upload_files_to_var = overrides->upload_files_to_var ? overrides->upload_files_to_var : base->upload_files_to_var;  */
+
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name;
     dsc->upload_dir = overrides->upload_dir ? overrides->upload_dir : base->upload_dir;
 
