@@ -24,6 +24,8 @@ extern int buffer_output;
 extern int headers_printed;
 extern int cacheFreeSize;
 
+extern ApacheRequest *global_req;
+
 /* Include and parse a file */
 
 int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
@@ -142,8 +144,8 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	    Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
 	    return TCL_ERROR;
 	}
-	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 
-		     global_rr->server, "Mod_Dtcl Error: %s", 
+	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE,
+		     global_rr->server, "Mod_Dtcl Error: %s",
 		     Tcl_GetStringFromObj (objv[2], (int *)NULL));
     } else {
 	if (objc != 2)
@@ -156,7 +158,7 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	    memwrite(&obuffer, arg1, length);
 	} else {
 	    print_headers(global_rr);
-	    flush_output_buffer(global_rr); 
+	    flush_output_buffer(global_rr);
 	    ap_rwrite(arg1, length, global_rr);
 	}
     }
@@ -171,7 +173,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     char *opt;
     if (objc < 2)
     {
-	Tcl_WrongNumArgs(interp, 1, objv, "headers option arg ?arg ...?");
+	Tcl_WrongNumArgs(interp, 1, objv, "option arg ?arg ...?");
 	return TCL_ERROR;
     }
     if (headers_printed != 0)
@@ -190,8 +192,8 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
 	if (objc < 4 || objc > 14)
 	{
-	    Tcl_WrongNumArgs(interp, 1, objv,
-			     "headers setcookie -name cookie-name -value cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure on/off?");
+	    Tcl_WrongNumArgs(interp, 2, objv,
+			     "-name cookie-name -value cookie-value ?-expires expires? ?-domain domain? ?-path path? ?-secure on/off?");
 	    return TCL_ERROR;
 	}
 
@@ -215,7 +217,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     {
 	if (objc != 3)
 	{
-	    Tcl_WrongNumArgs(interp, 1, objv, "headers redirect new-url");
+	    Tcl_WrongNumArgs(interp, 2, objv, "new-url");
 	    return TCL_ERROR;
 	}
 	ap_table_set(global_rr->headers_out, "Location", Tcl_GetStringFromObj (objv[2], (int *)NULL));
@@ -226,7 +228,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     {
 	if (objc != 4)
 	{
-	    Tcl_WrongNumArgs(interp, 1, objv, "set headername value");
+	    Tcl_WrongNumArgs(interp, 2, objv, "headername value");
 	    return TCL_ERROR;
 	}
 	ap_table_set(global_rr->headers_out,
@@ -237,7 +239,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     {
 	if (objc != 3)
 	{
-	    Tcl_WrongNumArgs(interp, 1, objv, "type mime/type");
+	    Tcl_WrongNumArgs(interp, 2, objv, "mime/type");
 	    return TCL_ERROR;
 	}
 	set_header_type(global_rr, Tcl_GetStringFromObj(objv[2], (int *)NULL));
@@ -247,7 +249,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
 	if (objc != 3)
 	{
-	    Tcl_WrongNumArgs(interp, 1, objv, "numeric response code");
+	    Tcl_WrongNumArgs(interp, 2, objv, "response code");
 	    return TCL_ERROR;
 	}
 	if (Tcl_GetIntFromObj(interp, objv[2], &st) != TCL_ERROR)
@@ -329,10 +331,10 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     /* retrieve cgi variables */
     ap_add_cgi_vars(global_rr);
     ap_add_common_vars(global_rr);
-    
+
     hdrs_arr = ap_table_elts(global_rr->headers_in);
     hdrs = (table_entry *) hdrs_arr->elts;
-    
+
     env_arr =  ap_table_elts(global_rr->subprocess_env);
     env     = (table_entry *) env_arr->elts;
 
@@ -347,15 +349,15 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	tmp = ap_pbase64decode(global_rr->pool, authorization);
 	user = ap_getword_nulls_nc(global_rr->pool, &tmp, ':');
 	pass = tmp;
- 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1), 
+ 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1),
 		       Tcl_NewStringObj("user", -1),
 		       STRING_TO_UTF_TO_OBJ(user),
-		       0);  
- 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1), 
+		       0);
+ 	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1),
 		       Tcl_NewStringObj("pass", -1),
 		       STRING_TO_UTF_TO_OBJ(pass),
-		       0);  
-    } 
+		       0);
+    }
 
     /* These were the "include vars"  */
     Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 0)), 0);
@@ -415,16 +417,165 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	    for (j = 0; j < ApacheCookieItems(c); j++) {
 		char *name = c->name;
 		char *value = ApacheCookieFetch(c, j);
-		Tcl_ObjSetVar2(interp, cookieobj, 
+		Tcl_ObjSetVar2(interp, cookieobj,
 			       STRING_TO_UTF_TO_OBJ(name),
 			       STRING_TO_UTF_TO_OBJ(value), 0);
 	    }
-	    
-	} 
+
+	}
     } while (0);
-	    
+
     /* cleanup system cgi variables */
     ap_clear_table(global_rr->subprocess_env);
+
+    return TCL_OK;
+}
+
+/* Tcl command to return a particular variable.  */
+
+/* Use:
+   var get foo
+   var list foo
+   var names
+   var number
+  */
+
+int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+{
+    char *command;
+    int i;
+    Tcl_Obj *result = NULL;
+    array_header *parmsarray = ap_table_elts(global_req->parms);
+    table_entry *parms = (table_entry *)parmsarray->elts;
+
+    if (objc < 2 || objc > 3)
+    {
+	Tcl_WrongNumArgs(interp, 1, objv, "(get varname|list varname|exists varname|names|number)");
+	return TCL_ERROR;
+    }
+    command = Tcl_GetStringFromObj(objv[1], NULL);
+
+    if (!strcmp(command, "get"))
+    {
+	char *key = NULL;
+	if (objc != 3)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, "variablename");
+	    return TCL_ERROR;
+	}
+	key = Tcl_GetStringFromObj(objv[2], NULL);
+
+        /* This isn't real efficient - move to hash table later
+           on... */
+	for (i = 0; i < parmsarray->nelts; ++i)
+	{
+	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    {
+		/* The following makes sure that we get one string,
+                   with no sub lists. */
+		if (result == NULL)
+		{
+		    result = STRING_TO_UTF_TO_OBJ(parms[i].val);
+		    Tcl_IncrRefCount(result);
+		} else {
+		    Tcl_Obj *tmpobjv[2];
+		    tmpobjv[0] = result;
+		    tmpobjv[1] = STRING_TO_UTF_TO_OBJ(parms[i].val);
+		    result = Tcl_ConcatObj(2, tmpobjv);
+		}
+	    }
+	}
+
+	if (result == NULL)
+	    Tcl_AppendResult(interp, "", NULL);
+	else
+	    Tcl_SetObjResult(interp, result);
+    } else if(!strcmp(command, "exists")) {
+	char *key;
+	if (objc != 3)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, "variablename");
+	    return TCL_ERROR;
+	}
+	key = Tcl_GetString(objv[2]);
+
+        /* This isn't real efficient - move to hash table later on. */
+	for (i = 0; i < parmsarray->nelts; ++i)
+	{
+	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    {
+		result = Tcl_NewIntObj(1);
+		Tcl_IncrRefCount(result);
+	    }
+	}
+
+	if (result == NULL)
+	    Tcl_SetObjResult(interp, Tcl_NewIntObj(0));
+	else
+	    Tcl_SetObjResult(interp, result);
+
+    } else if(!strcmp(command, "list")) {
+	char *key;
+	if (objc != 3)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, "variablename");
+	    return TCL_ERROR;
+	}
+	key = Tcl_GetStringFromObj(objv[2], NULL);
+
+        /* This isn't real efficient - move to hash table later on. */
+	for (i = 0; i < parmsarray->nelts; ++i)
+	{
+	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    {
+		if (result == NULL)
+		{
+		    result = Tcl_NewObj();
+		    Tcl_IncrRefCount(result);
+		}
+		Tcl_ListObjAppendElement(interp, result,
+					 STRING_TO_UTF_TO_OBJ(parms[i].val));
+	    }
+	}
+
+	if (result == NULL)
+	    Tcl_AppendResult(interp, "", NULL);
+	else
+	    Tcl_SetObjResult(interp, result);
+    } else if(!strcmp(command, "names")) {
+	if (objc != 2)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, NULL);
+	    return TCL_ERROR;
+	}
+	result = Tcl_NewObj();
+	Tcl_IncrRefCount(result);
+	for (i = 0; i < parmsarray->nelts; ++i)
+	{
+	    Tcl_ListObjAppendElement(interp, result,
+				     STRING_TO_UTF_TO_OBJ(parms[i].key));
+	}
+
+	if (result == NULL)
+	    Tcl_AppendResult(interp, "", NULL);
+	else
+	    Tcl_SetObjResult(interp, result);
+
+    } else if(!strcmp(command, "number")) {
+	if (objc != 2)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, NULL);
+	    return TCL_ERROR;
+	}
+
+	result = Tcl_NewIntObj(parmsarray->nelts);
+	Tcl_IncrRefCount(result);
+	Tcl_SetObjResult(interp, result);
+    } else {
+	/* bad command  */
+	Tcl_AddErrorInfo(interp, "bad option: must be one of 'get, list, names, number'");
+	return TCL_ERROR;
+    }
 
     return TCL_OK;
 }
@@ -460,6 +611,6 @@ int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     print_headers(global_rr);
     Tcl_Free(obuffer.buf);
     obuffer.buf = NULL;
-    obuffer.len = 0;    
+    obuffer.len = 0;
     return TCL_OK;
 }

@@ -8,7 +8,7 @@ package require tcltest
 package require http 2.1
 
 set urlbase "http://localhost/"
-set testfilename "dtcl-test.ttml"
+set testfilename "dtcl-test2.ttml"
 
 ::tcltest::test hello-1.1 {hello world test} {
     set page [ ::http::geturl "${urlbase}$testfilename" ]

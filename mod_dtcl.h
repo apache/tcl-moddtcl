@@ -34,6 +34,10 @@
    use <? ?> tags. */
 #define USE_OLD_TAGS 1 
 
+/* Turn off 'old-style' $VARS variable handling, and use only the
+   'var' command. */
+#define USE_ONLY_VAR_COMMAND 0
+
 /* End Configuration options  */
 
 #define STARTING_SEQUENCE "<?"

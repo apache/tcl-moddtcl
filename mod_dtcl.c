@@ -90,6 +90,7 @@
 
 /* *** Global variables *** */
 request_rec *global_rr;		/* request rec */
+ApacheRequest *global_req;     /* libapreq request  */
 Tcl_Encoding system_encoding;    /* Default encoding  */
 
 /* output buffer for initial buffer_add. We use traditional memory
@@ -674,7 +675,7 @@ int send_content(request_rec *r)
 
     Tcl_Interp *interp;
 
-    ApacheRequest *req;
+    ApacheRequest *req = NULL;
     ApacheUpload *upload;
 
     global_rr = r;		/* Assign request to global request var */
@@ -722,15 +723,17 @@ int send_content(request_rec *r)
 
     /* Apache Request stuff */
     req = ApacheRequest_new(r);
-   if (upload_files_to_var)
-   {
-       req->hook_data = interp;
-       req->upload_hook = dtcl_upload_hook; 
-   }
-
+    global_req = req;
+    if (upload_files_to_var)
+    {
+	req->hook_data = interp;
+	req->upload_hook = dtcl_upload_hook; 
+    }
+    
     ApacheRequest___parse(req);
     
     /* take results and create tcl variables from them */
+#if USE_ONLY_VAR_COMMAND == 1
     if (req->parms)
     {
 	int i;
@@ -761,6 +764,7 @@ int send_content(request_rec *r)
 	}
 	
     }
+#endif 
    upload = req->upload;
 
    /* Loop through uploaded files */
@@ -843,6 +847,7 @@ void tcl_create_commands(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "var", Var, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);

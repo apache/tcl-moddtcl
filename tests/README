@@ -11,7 +11,7 @@ How to run the tests:
 Assuming you have a system which runs mod_dtcl, put the dtcl-test.ttml
 file somewhere under your document root, and modify this line:
 
-set urlbase "http://eugene.i.linuxcare.it/~davidw/tests/"
+set urlbase "http://localhost/"
 
 to something like
 
