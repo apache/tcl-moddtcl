@@ -76,6 +76,7 @@
 #include <string.h>
 
 #include "tcl_commands.h"
+#include "parser.h"
 #include "apache_request.h"
 #include "mod_dtcl.h"
 
@@ -368,14 +369,8 @@ end:
 static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf)
 {
     /* BEGIN PARSER  */
-    char inside = 0;	/* are we inside the starting/ending delimiters  */
+    int inside = 0;	/* are we inside the starting/ending delimiters  */
 
-    const char *strstart = STARTING_SEQUENCE;
-    const char *strend = ENDING_SEQUENCE;
-
-    char c;
-    int ch;
-    int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
 
     FILE *f = NULL;
 
@@ -386,7 +381,6 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
 	return HTTP_FORBIDDEN;
     }
 
-    /* Beginning of the file parser */
     if (toplevel)
     {
 	Tcl_SetStringObj(outbuf, "namespace eval request {\n", -1);
@@ -397,109 +391,22 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
     else
 	Tcl_SetStringObj(outbuf, "hputs \"\n", -1);
 
-    while ((ch = getc(f)) != EOF)
+    /* if inside < 0, it's an error  */
+    inside = dtcl_parser(outbuf, f);
+    if (inside < 0)
     {
-	if (ch == -1)
-	    if (ferror(f))
-	    {
-		ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
-			     "Encountered error in mod_dtcl getchar routine while reading %s",
-			     r->uri);
-		ap_pfclose( r->pool, f);
-	    }
-	c = ch;
-	if (!inside)
+	if (ferror(f))
 	{
-	    /* OUTSIDE  */
-
-#if USE_OLD_TAGS == 1
-	    if (c == '<')
-	    {
-		int nextchar = getc(f);
-		if (nextchar == '+')
-		{
-		    Tcl_AppendToObj(outbuf, "\"\n", 2);
-		    inside = 1;
-		    p = 0;
-		    continue;
-		} else {
-		    ungetc(nextchar, f);
-		}
-	    }
-#endif
-
-	    if (c == strstart[p])
-	    {
-		if ((++p) == endseqlen)
-		{
-		    /* ok, we have matched the whole ending sequence - do something  */
-		    Tcl_AppendToObj(outbuf, "\"\n", 2);
-		    inside = 1;
-		    p = 0;
-		    continue;
-		}
-	    } else {
-		if (p > 0)
-		    Tcl_AppendToObj(outbuf, (char *)strstart, p);
-		/* or else just put the char in outbuf  */
-		if (c == '$')
-		    Tcl_AppendToObj(outbuf, "\\$", -1);
-		else if ( c == '[')
-		    Tcl_AppendToObj(outbuf, "\\[", -1);
-		else if ( c == ']')
-		    Tcl_AppendToObj(outbuf, "\\]", -1);
-		else if ( c == '"')
-		    Tcl_AppendToObj(outbuf, "\\\"", -1);
-		else if ( c == '\\')
-		    Tcl_AppendToObj(outbuf, "\\\\", -1);
-		else
-		    Tcl_AppendToObj(outbuf, &c, 1);
-
-		p = 0;
-		continue;
-	    }
-	} else {
-	    /* INSIDE  */
-
-#if USE_OLD_TAGS == 1
-	    if (c == '+')
-	    {
-		int nextchar = getc(f);
-		if (nextchar == '>')
-		{
-		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
-		    inside = 0;
-		    p = 0;
-		    continue;
-		} else {
-		    ungetc(nextchar, f);
-		}
-	    }
-#endif
-
-	    if (c == strend[p])
-	    {
-		if ((++p) == startseqlen)
-		{
-		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
-		    inside = 0;
-		    p = 0;
-		    continue;
-		}
-	    }
-	    else
-	    {
-		/*  plop stuff into outbuf, which we will then eval   */
-		if (p > 0)
-		    Tcl_AppendToObj(outbuf, (char *)strend, p);
-		Tcl_AppendToObj(outbuf, &c, 1);
-		p = 0;
-	    }
+	    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
+			 "Encountered error in mod_dtcl getchar routine while reading %s",
+			 r->uri);
+	    ap_pfclose( r->pool, f);
 	}
     }
+
     ap_pfclose(r->pool, f);
 
-    if (!inside)
+    if (inside == 0)
     {
 	Tcl_AppendToObj(outbuf, "\"\n", 2);
     }
@@ -892,7 +799,8 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	    mydsc = ap_pcalloc(p, sizeof(dtcl_server_conf));	    
 	    ap_set_module_config(sr->module_config, &dtcl_module, mydsc);
 	    copy_dtcl_config(p, dsc, mydsc);
-	    mydsc->server_interp = NULL;
+	    if (dsc->seperate_virtual_interps != 0)
+		mydsc->server_interp = NULL;
 	} else {
 	    mydsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
 	}
@@ -975,18 +883,34 @@ static const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
     dsc->upload_dir = arg;
     return NULL;
 }
-const char *set_uploadmax(cmd_parms *cmd, void *dummy, char *arg)
+
+static const char *set_uploadmax(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
     dsc->upload_max = strtol(arg, NULL, 10);
     return NULL;
 }
-const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
+
+static const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    dsc->upload_files_to_var = strtol(arg, NULL, 10);
+    if (!strcmp(arg, "on"))
+	dsc->upload_files_to_var = 1;
+    else
+	dsc->upload_files_to_var = 0;
+    return NULL;
+}
+
+static const char *set_seperatevirtinterps(cmd_parms *cmd, void *dummy, char *arg)
+{
+    server_rec *s = cmd->server;
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    if (!strcmp(arg, "on"))
+	dsc->seperate_virtual_interps = 1;
+    else 
+	dsc->seperate_virtual_interps = 0;
     return NULL;
 }
 
@@ -1033,6 +957,7 @@ static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf
     newdsc->cache_free = olddsc->cache_free;
     newdsc->upload_max = olddsc->upload_max;
     newdsc->upload_files_to_var = olddsc->upload_files_to_var;
+    newdsc->seperate_virtual_interps = olddsc->seperate_virtual_interps;
     newdsc->server_name = olddsc->server_name;
     newdsc->upload_dir = olddsc->upload_dir;
     newdsc->objCacheList = olddsc->objCacheList;
@@ -1069,6 +994,7 @@ static void *create_dtcl_config(pool *p, server_rec *s)
     *(dsc->cache_free) = 0;
     dsc->upload_max = 0;
     dsc->upload_files_to_var = 0;
+    dsc->seperate_virtual_interps = 0;
     dsc->server_name = NULL;
     dsc->upload_dir = "/tmp";
     dsc->objCacheList = NULL;
@@ -1099,6 +1025,7 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dtcl_server_conf *base = (dtcl_server_conf *) basev;
     dtcl_server_conf *overrides = (dtcl_server_conf *) overridesv;
 
+    fprintf(stderr, __FUNCTION__ "\n");
     dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
 
 #if 0 /* this stuff should only be done once at the top level  */
@@ -1119,7 +1046,6 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 /*     dsc->cache_size = overrides->cache_size ? overrides->cache_size : base->cache_size;
     dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;  */
     dsc->upload_max = overrides->upload_max ? overrides->upload_max : base->upload_max;
-/*     dsc->upload_files_to_var = overrides->upload_files_to_var ? overrides->upload_files_to_var : base->upload_files_to_var;  */
 
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name;
     dsc->upload_dir = overrides->upload_dir ? overrides->upload_dir : base->upload_dir;
@@ -1171,7 +1097,8 @@ const command_rec dtcl_cmds[] =
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
     {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},
-    {"Dtcl_UploadFilesToVar", set_filestovar, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadFilesToVar 1/0"},
+    {"Dtcl_UploadFilesToVar", set_filestovar, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadFilesToVar on/off"},
+    {"Dtcl_SeperateVirtualInterps", set_seperatevirtinterps, NULL, RSRC_CONF, TAKE1, "Dtcl_SeperateVirtualInterps on/off"},
     {NULL}
 };
 
