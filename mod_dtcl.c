@@ -175,37 +175,36 @@ typedef struct {
 } dtcl_server_conf;
 
 /* Functions for Tcl Channel */
-/*
+
 static int closeproc(ClientData, Tcl_Interp *);
 static int inputproc(ClientData, char *, int, int *);
-*/
 static int outputproc(ClientData, char *, int, int *);
-/*
 static int setoptionproc(ClientData, Tcl_Interp *, char *, char *);
-static int getoptionproc(ClientData, Tcl_Interp *, char *, Tcl_DString *);
+/*
+  static int getoptionproc(ClientData, Tcl_Interp *, char *, Tcl_DString *); */
 static void watchproc(ClientData, int);
-*/
+static int gethandleproc(ClientData, int, ClientData *);
+
 /* Apache BUFF Channel Type */
 static Tcl_ChannelType Achan = {
     "apache_channel",
     NULL,
-    NULL,
-    NULL,
+    closeproc,
+    inputproc,
     outputproc,
     NULL,
+    setoptionproc,
     NULL,
-    NULL,
-    NULL,
-#if TCL_MINOR_VERSION >= 2
-    NULL,
+    watchproc,
+    gethandleproc,
     NULL
-#else
-    NULL
-#endif
 };
 
 /* just need some arbitrary non-NULL pointer which can't also be a request_rec */
 #define NESTED_INCLUDE_MAGIC	(&dtcl_module)
+
+static char *dtcl_memcat(void *, int, void *, int);
+static char *dtcl_memdup(void *, int);
 
 static int memwrite(obuff *, char *, int);
 static int multipart(char *, request_rec *, char *, int, int);
@@ -219,17 +218,10 @@ static int print_error(request_rec *, int, char *);
 static int flush_output_buffer(request_rec *);
 static void tcl_init_stuff(server_rec *s, pool *p);
 
-/*
-int closeproc(ClientData instancedata, Tcl_Interp *interp)
-{
-    return TCL_OK;
-}
-
 int inputproc(ClientData instancedata, char *buf, int toRead, int *errorCodePtr)
 {
-    return TCL_OK;
+    return EINVAL;
 }
-*/
 
 /* This is the output 'method' for the Memory Buffer Tcl 'File'
    Channel that we create to divert stdout to */
@@ -240,23 +232,35 @@ static int outputproc(ClientData instancedata, char *buf, int toWrite, int *erro
     return toWrite;		
 } 
 
-/* int setoptionproc(ClientData instancedata, Tcl_Interp *interp,
-				      char *optionname, char *value)
+static int closeproc(ClientData instancedata, Tcl_Interp *interp2)
+{
+    flush_output_buffer(global_rr);
+    return 0;
+}
+
+static int setoptionproc(ClientData instancedata, Tcl_Interp *interp, char *optionname, char *value)
 {
     return TCL_OK;
 }
 
+/*
 int getoptionproc(ClientData instancedata, Tcl_Interp *intepr,
 				      char *optionname, Tcl_DString *dsPtr)
 {
     return TCL_OK;
 }
+*/
 
-void  watchproc(ClientData instancedata, int mask)
+static void watchproc(ClientData instancedata, int mask)
 {
+    /* not much to do here */
     return;
 }
-*/
+
+static int gethandleproc(ClientData instancedata, int direction, ClientData *handlePtr)
+{
+    return TCL_ERROR;
+}
 
 /* concatenate two memory regions  */
 
@@ -1040,7 +1044,7 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		*(line + boundarysz + 3) == '-')
 		goto cleanup;
 	    
-	} else if (!strncmp(line, CONTENT_DISP, CONTENT_DISP_LEN)) {
+	} else if (!strncasecmp(line, CONTENT_DISP, CONTENT_DISP_LEN)) {
 	    /* Parse stuff like this: name="foobar"; filename="blah.txt" */
 	    char *vars; 
 	    char *base;
@@ -1630,7 +1634,7 @@ static int send_content(request_rec *r)
     (const char*)string_content_type = ap_table_get(r->headers_in, "Content-type");
 
     if (string_content_type != NULL)
-	if (!strncmp(string_content_type, "multipart/form-data", 19))
+	if (!strncasecmp(string_content_type, "multipart/form-data", 19))
 	{	
 	    char *length;
 	    content_type = MULTIPART_FORM_DATA;
