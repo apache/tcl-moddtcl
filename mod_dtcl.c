@@ -1030,7 +1030,6 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 
     dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
 
-    fprintf(stderr, "merge_dtcl_config\n");
 #if 0 /* this stuff should only be done once at the top level  */
     dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ? overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
 
