@@ -1,7 +1,8 @@
 ;; two-mode-mode.el -- switches between tcl and sgml(html) modes
 ;; $Id$
 
-;; two-mode-mode.el is Copyright David Welton <davidw@efn.org> 1999, 2000
+;; two-mode-mode.el is Copyright David Welton <davidw@dedasys.com>
+;; 1999, 2000, 2001
 
 ;; two-mode-mode.el may be distributed under the terms of the Apache
 ;; Software License, Version 1.1
@@ -17,17 +18,36 @@
 ;; Use of 'psgml-mode' is highly recommended.  It is, of course, a
 ;; part of Debian GNU/Linux.
 
+;; Modified by Marco Pantaleoni <panta@elasticworld.org>
+;; to allow execution of an hook on mode switching.
+;; Also added a standard mode hook and some documentation strings.
+
 ;; configure these:
-(defvar two-mode-lmatch "<?")
-(defvar two-mode-rmatch "?>")
+(defvar two-mode-lmatch "<?"
+  "Open tag for `second' mode.")
+(defvar two-mode-rmatch "?>"
+  "Close tag for `second' mode.")
+
+(defvar default-mode (list 'html-mode "HTML")
+  "Default mode.")
+(defvar second-mode  (list 'tcl-mode "Tcl")
+  "Second mode: mode used inside special tags.")
+;; ----------------
 
 (defvar two-mode-update 0)
 (defvar two-mode-mode-idle-timer nil)
 (defvar two-mode-bool nil)
-(defvar default-mode (list 'html-mode "HTML"))  ;; outside the above tokens
-(defvar second-mode (list 'tcl-mode "TCL"))     ;; inside
 (defvar two-mode-mode-delay (/ (float 1) (float 8)))
-;; ----------------
+
+;; Two mode hook
+(defvar two-mode-hook nil
+  "*Hook called by `two-mode'.")
+(setq two-mode-hook nil)
+
+;; Mode switching hook
+(defvar two-mode-switch-hook nil
+  "*Hook called upon mode switching.")
+(setq two-mode-switch-hook nil)
 
 (defun two-mode-mode-setup ()
   (make-local-hook 'post-command-hook)
@@ -54,6 +74,8 @@
 	    (funcall (car second-mode))
 	(funcall (car default-mode))))
       (two-mode-mode-setup)
+      (if two-mode-switch-hook
+	  (run-hooks 'two-mode-switch-hook))
       (if (eq font-lock-mode t)
 	  (font-lock-fontify-buffer))
       (turn-on-font-lock-if-enabled))))
@@ -81,7 +103,9 @@
   "Turn on two-mode-mode"
   (interactive)
   (funcall (car default-mode))
-  (two-mode-mode-setup))
+  (two-mode-mode-setup)
+  (if two-mode-hook
+     (run-hooks 'two-mode-hook)))
 
 (provide 'two-mode-mode)
 
