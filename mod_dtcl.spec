@@ -3,11 +3,12 @@
 
 Summary: Simple, fast Tcl server side scripting for Apache.
 Name: mod_dtcl
-Version: 0.11.5
+Version: 0.12.0
 Release: 1
 Copyright: Freely distributable and usable
 Group: System Environment/Daemons
 Source:	http://tcl.apache.org/mod_dtcl/download/%{name}-%{version}.tar.gz
+Patch: redhat-buildtcl.patch
 URL: http://tcl.apache.org/mod_dtcl/
 Packager: Simon Greaves <Simon.Greaves@bigfoot.com>
 BuildRoot: %{_tmppath}/%{name}-root
@@ -24,12 +25,10 @@ use the extensive codebase of existing Tcl code, on the web.
 
 %prep
 %setup -n %{name}
-sed -e 's/^INC=.*/INC=\/usr\/include\/apache/' \
-    -e 's/^APACHE=.*/APACHE=\/usr\/sbin/' \
-	< builddtcl.sh > rpm-builddtcl.sh
+%patch -p1 -b .redhat
 
 %build
-sh ./rpm-builddtcl.sh shared
+sh ./builddtcl.sh shared
 
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -45,6 +44,10 @@ install -c -s -m755 mod_dtcl.so $RPM_BUILD_ROOT%{_libdir}/apache/
 %{_libdir}/apache/mod_dtcl.so
 
 %changelog
+* Wed Jul 24 2002 Simon Greaves <Simon.Greaves@bigfoot.com>
+- added -DEAPI, removed extra flags from TCL_SHLIB_LD which caused
+  problems at runtime, updated to mod_dtcl-0.12.0
+
 * Wed Aug  1 2001 Simon Greaves <Simon.Greaves@bigfoot.com>
 - mod_dtcl-0.11.1 packaged.
 

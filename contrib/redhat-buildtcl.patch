@@ -1,0 +1,26 @@
+--- mod_dtcl.orig/builddtcl.sh	Wed Oct 10 03:29:47 2001
++++ mod_dtcl/builddtcl.sh	Wed Jul 24 12:54:01 2002
+@@ -39,7 +39,7 @@
+ fi
+ 
+ # Location of Apache include files.
+-INC=/usr/include/apache-1.3/  ######### CHANGEME ##########
++INC=/usr/include/apache
+ # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ # INC=$APACHE/src/include
+ 
+@@ -65,12 +65,13 @@
+ export TCL_CFLAGS_OPTIMIZE 
+ export TCL_CFLAGS_WARNING 
+ export TCL_EXTRA_CFLAGS
++EXTRA_FLAGS="-DEAPI" ; export EXTRA_FLAGS
+ export TCL_LIBS
+ export TCL_LIB_FLAG 
+ export TCL_LIB_SPEC
+ export TCL_PREFIX
+ export TCL_SHLIB_CFLAGS
+-export TCL_SHLIB_LD
++TCL_SHLIB_LD="gcc -pipe -shared" ; export TCL_SHLIB_LD
+ export TCL_SHLIB_SUFFIX
+ export TCL_STLIB_LD 
+ export TCL_SRC_DIR

@@ -1,5 +1,9 @@
-The provided spec file has been tested on RedHat 6 and 7 systems where
-it seems to 'do the right thing', YMMV for other RPM based systems.
+The provided spec file has been tested on RedHat 7.3 systems where it
+seems to 'do the right thing', YMMV for other RPM based systems.  Of
+particular note is that the tclConfig.sh file that ships with
+RedHat7.3 has gcc flags that break mod_dtcl. The included
+contrib/redhat-buildtcl.patch has a workaround for this, and also
+configures paths and adds the '-DEAPI' flag.
 
 Building and installing the RPM should be straightforward, something
 like:
@@ -14,7 +18,7 @@ RedHat/Apache configuration places the mod_dtcl directives directly
 into httpd.conf. The minimum you will require are:
 
 1) Open /etc/httpd/conf/httpd.conf in your favourite text editor and
-   locate the big list of lines starting 'LoadModule'. At the end of 
+   locate the big list of lines starting 'LoadModule'. At the end of
    this list, append:
 
 <IfDefine HAVE_DTCL>
