@@ -128,7 +128,7 @@
 #define DEFAULT_ERROR_MSG "[an error occurred while processing this directive]"
 #define DEFAULT_TIME_FORMAT "%A, %d-%b-%Y %H:%M:%S %Z"
 #define DEFAULT_HEADER_TYPE "text/html"
-#define DTCL_VERSION "0.8.5"
+/* #define DTCL_VERSION "0.8.5"  */
 
 /* *** Global variables *** */
 static Tcl_Interp *interp;              /* Tcl interpreter */
@@ -1315,9 +1315,11 @@ static int send_content(request_rec *r)
 }
 
 typedef struct {
-    char *dtcl_global_script;
-    char *dtcl_init_script;
-    char *dtcl_exit_script;
+    Tcl_Obj *dtcl_global_init_script;
+    Tcl_Obj *dtcl_child_init_script;
+    Tcl_Obj *dtcl_child_exit_script;
+    Tcl_Obj *dtcl_before_script;
+    Tcl_Obj *dtcl_after_script;
     int dtcl_cache_size;
 } dtcl_server_conf;
 
@@ -1375,13 +1377,13 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     Tcl_IncrRefCount(namespacePrologue);
 
 #if DBG
-    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"", dsc->dtcl_global_script);  /* XXX */
+    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"", Tcl_GetStringFromObj(dsc->dtcl_global_init_script, NULL));  /* XXX */
     ap_log_error(APLOG_MARK, APLOG_ERR, s, "Cache size = \"%d\"", dsc->dtcl_cache_size);  /* XXX */
 #endif
 
-    if (dsc->dtcl_global_script != NULL)
+    if (dsc->dtcl_global_init_script != NULL)
     {
-	rslt = Tcl_EvalFile(interp, dsc->dtcl_global_script);
+	rslt = Tcl_EvalObjEx(interp, dsc->dtcl_global_init_script, 0);
 	if (rslt != TCL_OK)
 	{
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s, "%s",
@@ -1396,7 +1398,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	if (ap_max_requests_per_child != 0)
 	    cacheSize = ap_max_requests_per_child / 2;
 	else
-	    cacheSize = 50; /* Arbitrary number */
+	    cacheSize = 10; /* Arbitrary number FIXME */
 	cacheFreeSize = cacheSize;
     }
     /* Initializing cache structures */
@@ -1412,27 +1414,32 @@ void dtcl_init_handler(server_rec *s, pool *p)
     ap_add_version_component("Mod_dtcl " DTCL_VERSION);
 }
 
-static const char *set_globalscript(cmd_parms *cmd, void *dummy, char *arg)
+static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)
 {
+    Tcl_Obj *objarg;
     server_rec *s = cmd->server;
     dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    conf->dtcl_global_script = arg;
-    return NULL;
-}
 
-static const char *set_initscript(cmd_parms *cmd, void *dummy, char *arg)
-{
-    server_rec *s = cmd->server;
-    dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    conf->dtcl_init_script = arg;
-    return NULL;
-}
-
-static const char *set_exitscript(cmd_parms *cmd, void *dummy, char *arg)
-{
-    server_rec *s = cmd->server;
-    dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    conf->dtcl_exit_script = arg;
+    if (arg == NULL || arg2 == NULL)
+    {
+	ap_log_error(APLOG_MARK, APLOG_ERR, global_rr->server, "Mod_Dtcl Error: Dtcl_Script requires two arguments");
+	return NULL;
+    }
+    
+    objarg = Tcl_NewStringObj(arg2, -1);
+    if (strcmp(arg, "GlobalInitScript") == 0) {
+	conf->dtcl_global_init_script = objarg;
+    } else if (strcmp(arg, "ChildInitScript") == 0) {
+	conf->dtcl_child_init_script = objarg;
+    } else if (strcmp(arg, "ChildExitScript") == 0) {
+	conf->dtcl_child_exit_script = objarg;
+    } else if (strcmp(arg, "BeforeScript") == 0) {
+	conf->dtcl_before_script = objarg;
+    } else if (strcmp(arg, "AfterScript") == 0) {
+	conf->dtcl_after_script = objarg;
+    } else {
+	ap_log_error(APLOG_MARK, APLOG_ERR, global_rr->server, "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript");
+    }
     return NULL;
 }
 
@@ -1447,18 +1454,19 @@ static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 static void *create_dtcl_config(pool *p, server_rec *s)
 {
     dtcl_server_conf *dts = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
-    dts->dtcl_global_script = NULL;
-    dts->dtcl_init_script = NULL;
-    dts->dtcl_exit_script = NULL;
+    dts->dtcl_global_init_script = NULL;
+    dts->dtcl_child_init_script = NULL;
+    dts->dtcl_child_exit_script = NULL;
+    dts->dtcl_before_script = NULL;
+    dts->dtcl_after_script = NULL;
     return dts;
 }
 
 static void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 {
     dtcl_server_conf *base = (dtcl_server_conf *) basev, *overrides = (dtcl_server_conf *) overridesv;
-    return overrides->dtcl_global_script ? overrides : base;
+    return overrides->dtcl_global_init_script ? overrides : base;
 }
-
 
 static void dtcl_child_init(server_rec *s, pool *p)
 {
@@ -1468,20 +1476,20 @@ static void dtcl_child_init(server_rec *s, pool *p)
     tcl_init_stuff(s, p);
 #endif
 
-    if (dsc->dtcl_init_script != NULL)
-	if (Tcl_EvalFile(interp, dsc->dtcl_init_script) != TCL_OK)
+    if (dsc->dtcl_child_init_script != NULL)
+	if (Tcl_EvalObjEx(interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
-			 "Problem running child init script: %s", dsc->dtcl_init_script);
+			 "Problem running child init script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_init_script, NULL));
 }
 
 static void dtcl_child_exit(server_rec *s, pool *p)
 {
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
 
-    if (dsc->dtcl_exit_script != NULL)
-	if (Tcl_EvalFile(interp, dsc->dtcl_exit_script) != TCL_OK)
+    if (dsc->dtcl_child_exit_script != NULL)
+	if (Tcl_EvalObjEx(interp, dsc->dtcl_child_exit_script, 0) != TCL_OK)
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
-			 "Problem running child exit script: %s", dsc->dtcl_exit_script);
+			 "Problem running child exit script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_exit_script, NULL));
 }
 
 static const handler_rec dtcl_handlers[] =
@@ -1493,9 +1501,7 @@ static const handler_rec dtcl_handlers[] =
 
 static const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_GlobalScript", set_globalscript, NULL, RSRC_CONF, TAKE1, "the name of the global configuration script"},
-    {"Dtcl_ChildInitScript", set_initscript, NULL, RSRC_CONF, TAKE1, "the name of the per child init configuration script"},
-    {"Dtcl_ChildExitScript", set_exitscript, NULL, RSRC_CONF, TAKE1, "the name of the per child exit configuration script"},
+    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "general script command"},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "number of ttml scripts cached"},
     {NULL}
 };

@@ -36,7 +36,7 @@ binary-arch: checkroot build
 	cp testdtcl debian/tmp/usr/bin/
 # Must have debmake installed for this to work. Otherwise please copy
 # /usr/bin/debstd into the debian directory and change debstd to debian/debstd
-	dh_installdocs *.html *.ttml INSTALL.txt use.txt readme.txt dtcl-tcl.txt dtcl.tcl two-mode-mode.el dtcl.gif
+	dh_installdocs docs/ contrib/
 	dh_installchangelogs
 	dh_installmanpages
 	dh_movefiles

@@ -1,6 +1,8 @@
-;; two-mode-mode.el -- switches between tcl and sgml(html) modes $Id:
-;; two-mode-mode.el,v 1.2.2.1 2000/06/21 23:55:05 davidw Exp $
+;; two-mode-mode.el -- switches between tcl and sgml(html) modes
+;; $Id$
+
 ;; two-mode-mode.el is Copyright David Welton <davidw@efn.org> 1999, 2000
+
 ;; two-mode-mode.el may be distributed under the terms of the Apache
 ;; Software License, Version 1.1
 
@@ -19,8 +21,8 @@
 (defvar two-mode-lmatch "<+")
 (defvar two-mode-rmatch "+>")
 
-(defvar default-mode (list 'sgml-mode "SGML"))
-(defvar second-mode (list 'tcl-mode "TCL"))
+(defvar default-mode (list 'sgml-mode "SGML"))  ;; outside the above tokens
+(defvar second-mode (list 'tcl-mode "TCL"))     ;; inside
 ;; ----------------
 
 (defun two-mode-mode-setup ()

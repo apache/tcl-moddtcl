@@ -1,0 +1,73 @@
+#!/usr/bin/tclsh
+
+# mod_dtcl test suite, by David N. Welton <davidw@linuxcare.com>
+
+# $Id$ 
+
+package require tcltest
+package require http 2.1
+
+set urlbase "http://eugene.i.prosa.it/~davidw/tests/"
+set testfilename "dtcl-test.ttml"
+
+::tcltest::test hello-1.1 {hello world test} {
+    set page [ ::http::geturl "${urlbase}$testfilename" ]
+    regexp -line {^Hello, World$} [ ::http::data $page ]
+} 1
+
+::tcltest::test i18n-1.1 {I18N test} {
+    set page [ ::http::geturl "${urlbase}$testfilename" ]
+    regexp -line {^¡ À È Ì Ò Ù - El Burro Sabe Más Que Tú!$} [ ::http::data $page ]
+} 1
+
+::tcltest::test getvariables-1.1 {GET variables} {
+    set page [ ::http::geturl "${urlbase}$testfilename?foobar=goober" ]
+    regexp -line {^VARS\(foobar\) = goober$} [ ::http::data $page ]
+} 1
+
+::tcltest::test getvariables-1.2 {GET variables + I18N} {
+    set page [ ::http::geturl "${urlbase}$testfilename?Más=Tú" ]
+    regexp -line {^VARS\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+::tcltest::test getvariables-1.3 {GET variables + I18N + encoding} {
+    set page [ ::http::geturl [ format "${urlbase}$testfilename?%s" [ ::http::formatQuery Más Tú ] ] ]
+    regexp -line {^VARS\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+::tcltest::test postvariables-1.1 {POST variables} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -query foobar=goober ]
+    regexp -line {^VARS\(foobar\) = goober$} [ ::http::data $page ]
+} 1
+
+::tcltest::test postvariables-1.2 {POST variables + I18N} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -query Más=Tú ]
+    regexp -line {^VARS\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+::tcltest::test postvariables-1.3 {POST variables + I18N + encoding} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -query [ ::http::formatQuery Más Tú ] ]
+    regexp -line {^VARS\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+::tcltest::test env-1.1 {Environment variable} {
+    set page [ ::http::geturl "${urlbase}$testfilename" ]
+    regexp -line "^ENVS\\(DOCUMENT_NAME\\) = $testfilename\$" [ ::http::data $page ]
+} 1
+
+::tcltest::test cookies-1.1 {Cookies} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -headers {Cookie "foo=bar"} ]
+    regexp -line {^COOKIES\(foo\) = bar$} [ ::http::data $page ]
+} 1
+
+::tcltest::test cookies-1.2 {Cookies + I18N} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -headers {Cookie "Más=Tú"} ]
+    regexp -line {^COOKIES\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+::tcltest::test cookies-1.3 {Cookies + I18N + encoding} {
+    set page [ ::http::geturl "${urlbase}$testfilename" -headers [ list Cookie [ ::http::formatQuery Más Tú ] ] ]
+    regexp -line {^COOKIES\(Más\) = Tú$} [ ::http::data $page ]
+} 1
+
+puts "Done"
