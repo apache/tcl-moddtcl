@@ -455,6 +455,9 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 
 int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
+    if (content_sent == 1)
+	return TCL_ERROR;
+
     print_headers(global_rr);
     Tcl_Free(obuffer.buf);
     obuffer.buf = NULL;

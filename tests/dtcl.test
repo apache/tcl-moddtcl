@@ -87,7 +87,7 @@ set testfilename "dtcl-test.ttml"
     set page [ ::http::geturl "${urlbase}$testfilename" ]
     upvar 0 $page state
     array set statehash $state(meta)
-    regexp -line {mod=dtcl; expires=01-01-2003} $statehash(Set-Cookie)
+    regexp -line {mod=dtcl; path=[^;]*; expires=01-01-2003} $statehash(Set-Cookie)
 } 1
 
 ::tcltest::cleanupTests

@@ -270,8 +270,6 @@ int print_headers(request_rec *r)
 
 int print_error(request_rec *r, int htmlflag, char *errstr)
 {
-    int j;
-
     set_header_type(r, DEFAULT_HEADER_TYPE);
     print_headers(r);
 
@@ -282,20 +280,9 @@ int print_error(request_rec *r, int htmlflag, char *errstr)
     {
 	if (htmlflag != 1)
 	{
-	    int ln = strlen(errstr);
-	    for (j = 0; j < ln; j++)
-	    {
-		if (errstr[j] == '<')
-		{
-		    ap_rwrite("&lt;", 4, r);
-		}  else if (errstr[j] == '>') {
-		    ap_rwrite("&gt;", 4, r);
-		} else { 
-		    ap_rwrite((errstr+j), 1, r);
-		}
-	    }
+	    ap_rputs(ap_escape_html(r->pool, errstr), r);
 	} else {
-	    ap_rputs(errstr, global_rr);  	
+	    ap_rputs(errstr, r);
 	}
     }    
     if (htmlflag != 1)
@@ -317,39 +304,6 @@ int flush_output_buffer(request_rec *r)
     }
     content_sent = 1;
     return 0;
-}
-
-/* Taken from PHP3 */
-/* mime encode a string */
-
-char *cgiEncodeObj (Tcl_Obj *sObj)
-{
-    unsigned char hexchars[] = "0123456789ABCDEF";
-    register int x, y;
-    unsigned char *str;
-    char *s;
-    int len;
-
-    s = Tcl_GetStringFromObj(sObj, &len);
-    str = (unsigned char *) ap_palloc(global_rr->pool, 3 * len + 1);
-    for (x = 0, y = 0; len--; x++, y++)
-    {
-	str[y] = (unsigned char) s[x];
-	if (str[y] == ' ')
-	{
-	    str[y] = '+';
-	} else if ((str[y] < '0' && str[y] != '-' && str[y] != '.') ||
-		   (str[y] < 'A' && str[y] > '9') ||
-		   (str[y] > 'Z' && str[y] < 'a' && str[y] != '_') ||
-		   (str[y] > 'z'))
-	{
-	    str[y++] = '%';
-	    str[y++] = hexchars[(unsigned char) s[x] >> 4];
-	    str[y] = hexchars[(unsigned char) s[x] & 15];
-	}
-    }
-    str[y] = '\0';
-    return ((char *) str);
 }
 
 /* Function to convert strings to UTF encoding */
