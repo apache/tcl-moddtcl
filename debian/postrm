@@ -11,7 +11,7 @@ set -e
 killconf () {
 	tmpfile=/etc/apache/httpd.conf.tmp.$$
 	cat /etc/apache/httpd.conf |\
-		 sed 's/^(LoadModule.*mod_dtcl\.so)/#\1/' > $tmpfile
+		 sed 's/^\(LoadModule.*mod_dtcl\.so\)/#\1/' > $tmpfile
 	mv -f $tmpfile /etc/apache/httpd.conf
 	[ -x /usr/sbin/apachectl ] && ask_restart
 }
@@ -19,7 +19,7 @@ killconf () {
 killconf_ssl () {
        tmpfile=/etc/apache-ssl/httpd.conf.tmp.$$
        cat /etc/apache-ssl/httpd.conf |\
-                sed 's/^(LoadModule.*mod_dtcl\.so)/#\1/' > $tmpfile
+                sed 's/^\(LoadModule.*mod_dtcl\.so\)/#\1/' > $tmpfile
        mv -f $tmpfile /etc/apache-ssl/httpd.conf
        [ -x /usr/sbin/apache-sslctl ] && ask_restart_ssl
 }

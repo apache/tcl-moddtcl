@@ -1,3 +1,9 @@
+libapache-mod-dtcl (1.0.1-2) unstable; urgency=low
+
+  * Make sure postrm script works properly.
+
+ -- David N. Welton <davidw@debian.org>  Tue, 19 Aug 2003 10:10:43 +0200
+
 libapache-mod-dtcl (1.0.1-1) unstable; urgency=low
 
   * Made file upload stuff work on windows, thanks to Holger Zeinert.
