@@ -6,7 +6,7 @@ libapache-mod-dtcl (1.0.0-1) unstable; urgency=low
 
   * Update to latest httpd-apreq code.
 
- --
+ -- David N. Welton <davidw@debian.org>  Mon,  4 Nov 2002 17:05:14 -0800
 
 libapache-mod-dtcl (0.12.1-1) unstable; urgency=low
 
