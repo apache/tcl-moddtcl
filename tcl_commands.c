@@ -438,6 +438,7 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
    var list foo
    var names
    var number
+   var all
   */
 
 int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
@@ -450,7 +451,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 
     if (objc < 2 || objc > 3)
     {
-	Tcl_WrongNumArgs(interp, 1, objv, "(get varname|list varname|exists varname|names|number)");
+	Tcl_WrongNumArgs(interp, 1, objv, "(get varname|list varname|exists varname|names|number|all)");
 	return TCL_ERROR;
     }
     command = Tcl_GetStringFromObj(objv[1], NULL);
@@ -571,9 +572,31 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 	result = Tcl_NewIntObj(parmsarray->nelts);
 	Tcl_IncrRefCount(result);
 	Tcl_SetObjResult(interp, result);
+    } else if(!strcmp(command, "all")) {
+	if (objc != 2)
+	{
+	    Tcl_WrongNumArgs(interp, 2, objv, NULL);
+	    return TCL_ERROR;
+	}
+	result = Tcl_NewObj();
+	Tcl_IncrRefCount(result);
+	for (i = 0; i < parmsarray->nelts; ++i)
+	{
+	    Tcl_ListObjAppendElement(interp, result,
+				     STRING_TO_UTF_TO_OBJ(parms[i].key));
+	    Tcl_ListObjAppendElement(interp, result,
+				     STRING_TO_UTF_TO_OBJ(parms[i].val));
+	}
+
+	if (result == NULL)
+	    Tcl_AppendResult(interp, "", NULL);
+	else
+	    Tcl_SetObjResult(interp, result);
+
+
     } else {
 	/* bad command  */
-	Tcl_AddErrorInfo(interp, "bad option: must be one of 'get, list, names, number'");
+	Tcl_AddErrorInfo(interp, "bad option: must be one of 'get, list, names, number, all'");
 	return TCL_ERROR;
     }
 
