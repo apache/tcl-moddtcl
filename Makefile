@@ -22,10 +22,10 @@ COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNIN
 
 all: builddtcl_test shared
 
-static: $(OBJECTS)
+static: $(OBJECTS) docs/documentation.txt
 	$(TCL_STLIB_LD) $(STATICLIB) $(OBJECTS) 
 
-shared: $(OBJECTS)
+shared: $(OBJECTS) docs/documentation.txt
 	$(TCL_SHLIB_LD) -o $(SHLIB) $(OBJECTS) $(TCL_LIB_SPEC) $(TCL_LIBS)
 
 # I don't have too many C files, so it's just clearer to do things by
@@ -43,12 +43,15 @@ tcl_commands.o: tcl_commands.c tcl_commands.h mod_dtcl.h
 	$(COMPILE)
 
 clean: 
-	-rm -f $(STATICLIB) $(SHLIB) *.o *~
+	-rm -f $(STATICLIB) $(SHLIB) *.o *~ docs/documentation.txt
 
 version: 
 	./cvsversion.tcl
 
-dist: clean version
+docs/documentation.txt:
+	if test -x `which lynx` ; then 	lynx -dump ./docs/documentation.html > ./docs/documentation.txt ; else echo "You need lynx to create documentation.txt from documentation.html" ; fi
+
+dist: clean docs/documentation.txt version
 	(cd .. ; tar -czvf mod_dtcl-`cat mod_dtcl/VERSION`.tar.gz mod_dtcl/ ; )
 
 install: static
