@@ -29,11 +29,11 @@ extern Tcl_Obj *uploadstorage[];
 int MakeURL(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    
+
     if (objc != 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "filename");
-	return TCL_ERROR;	
+	return TCL_ERROR;
     }
     Tcl_SetResult(interp, ap_construct_url(POOL, Tcl_GetString(objv[1]), globals->r), NULL);
     return TCL_OK;
@@ -571,7 +571,9 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
         /* This isn't real efficient - move to hash table later on. */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL),
+			 strlen(key) < strlen(parms[i].key) ?
+			 strlen(parms[i].key) : strlen(key)))
 	    {
 		result = Tcl_NewIntObj(1);
 		Tcl_IncrRefCount(result);
@@ -595,7 +597,9 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
         /* This isn't real efficient - move to hash table later on. */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), 
+			 strlen(key) < strlen(parms[i].key) ?
+			 strlen(parms[i].key) : strlen(key)))
 	    {
 		if (result == NULL)
 		{

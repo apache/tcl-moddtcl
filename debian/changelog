@@ -1,3 +1,10 @@
+libapache-mod-dtcl (0.11.8-1) unstable; urgency=low
+
+  * Make sure to check the correct variable names with 'list' and
+    'exists. as well.
+
+ -- David N. Welton <davidw@debian.org>  Fri,  3 May 2002 16:04:51 +0200
+
 libapache-mod-dtcl (0.11.7-1) unstable; urgency=low
 
   * mod_dtcl.c (execute_and_check): Make sure to output results of
