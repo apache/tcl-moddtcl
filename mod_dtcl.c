@@ -94,19 +94,18 @@ obuff obuffer = {
 static Tcl_Obj *namespacePrologue;      /* initial bit of Tcl for namespace creation */
 module MODULE_VAR_EXPORT dtcl_module;
 
-static char **objCacheList; 		/* Array of cached objects (for priority handling) */
-static Tcl_HashTable objCache; 		/* Objects cache - the key is the script name */
 
-int buffer_output = 0;           /* Start with output buffering off */
+int buffer_output = 0;          /* Start with output buffering off */
 int headers_printed = 0; 	/* has the header been printed yet? */
-static int headers_set = 0; 	        /* has the header been set yet? */
-int content_sent = 0;            /* make sure something gets sent */
+static int headers_set = 0;     /* has the header been set yet? */
+int content_sent = 0;           /* make sure something gets sent */
 
 //dtcl_interp_globals globals;
 
 #define GETREQINTERP(req) ((dtcl_server_conf *)ap_get_module_config(req->server->module_config, &dtcl_module))->server_interp
 
 static void tcl_init_stuff(server_rec *s, pool *p);
+static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf);
 static int send_content(request_rec *);
 static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
 
@@ -381,7 +380,7 @@ end:
 
 /* Parse and execute a ttml file */
 
-static int get_ttml_file(request_rec *r, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf)
+static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf)
 {
     /* BEGIN PARSER  */
     char inside = 0;	/* are we inside the starting/ending delimiters  */
@@ -395,9 +394,6 @@ static int get_ttml_file(request_rec *r, Tcl_Interp *interp, char *filename, int
 
     FILE *f = NULL;
 
-    dtcl_server_conf *conf = NULL;
-    conf = dtcl_get_conf(r);
-
     if (!(f = ap_pfopen(r->pool, filename, "r")))
     {
 	ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
@@ -409,8 +405,8 @@ static int get_ttml_file(request_rec *r, Tcl_Interp *interp, char *filename, int
     if (toplevel)
     {
 	Tcl_SetStringObj(outbuf, "namespace eval request {\n", -1);
-	if (conf->dtcl_before_script)
-	    Tcl_AppendObjToObj(outbuf, conf->dtcl_before_script);
+	if (dsc->dtcl_before_script)
+	    Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
 	Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
     }
     else
@@ -525,8 +521,8 @@ static int get_ttml_file(request_rec *r, Tcl_Interp *interp, char *filename, int
 
     if (toplevel)
     {
-	if (conf->dtcl_after_script)
-	    Tcl_AppendObjToObj(outbuf, conf->dtcl_after_script);
+	if (dsc->dtcl_after_script)
+	    Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
 
 /* 	Tcl_AppendToObj(outbuf, "\n}\nnamespace delete request\n", -1); seems redundant */
 	Tcl_AppendToObj(outbuf, "\n}\n", -1);
@@ -581,7 +577,7 @@ static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r
 
 /* This is a seperate function so that it may be called from 'Parse' */
 
-int get_parse_exec_file(request_rec *r, int toplevel)
+int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
 {
     char *hashKey = NULL;
     int isNew = 0;
@@ -591,16 +587,14 @@ int get_parse_exec_file(request_rec *r, int toplevel)
     Tcl_HashEntry *entry = NULL;
     Tcl_Interp *interp = GETREQINTERP(r);
 
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(r->server->module_config, &dtcl_module);
-
     /* Look for the script's compiled version. If it's not found,
        create it. */
-    if (dsc->cache_size)
+    if (*(dsc->cache_size))
     {
 	hashKey = ap_psprintf(r->pool, "%s%ld%ld%d", r->filename, r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
-	entry = Tcl_CreateHashEntry(&objCache, hashKey, &isNew);
+	entry = Tcl_CreateHashEntry(dsc->objCache, hashKey, &isNew);
     }
-    if (isNew || !dsc->cache_size)
+    if (isNew || *(dsc->cache_size) == 0)
     {
 	outbuf = Tcl_NewObj();
 	Tcl_IncrRefCount(outbuf);
@@ -608,7 +602,7 @@ int get_parse_exec_file(request_rec *r, int toplevel)
 	if(!strcmp(r->content_type, "application/x-httpd-tcl"))
 	{
 	    /* It's a TTML file  */
-	    result = get_ttml_file(r, interp, r->filename, 1, outbuf);
+	    result = get_ttml_file(r, dsc, interp, r->filename, 1, outbuf);
 	} else {
 	    /* It's a plain Tcl file */
 	    result = get_tcl_file(r, interp, r->filename, &(r->finfo), outbuf);
@@ -616,20 +610,19 @@ int get_parse_exec_file(request_rec *r, int toplevel)
 	if (result != TCL_OK)
 	    return result;
 
-	if (dsc->cache_size)
+	if (*(dsc->cache_size))
 	    Tcl_SetHashValue(entry, (ClientData)outbuf);
 
-	if (dsc->cache_free) {
-	    /* This MUST be malloc-ed, because it's permanent */
-	    objCacheList[--(dsc->cache_free) ] = strdup(hashKey);
-	} else if (dsc->cache_size) { /* if it's zero, we just skip this... */
+	if (*(dsc->cache_free)) {
+	    dsc->objCacheList[-- *(dsc->cache_free) ] = strdup(hashKey);
+	} else if (*(dsc->cache_size)) { /* if it's zero, we just skip this... */
 	    Tcl_HashEntry *delEntry;
-	    delEntry = Tcl_FindHashEntry(&objCache, objCacheList[dsc->cache_size - 1]);
+	    delEntry = Tcl_FindHashEntry(dsc->objCache, dsc->objCacheList[*(dsc->cache_size) - 1]);
 	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
 	    Tcl_DeleteHashEntry(delEntry);
-	    free(objCacheList[dsc->cache_size - 1]);
-	    memmove(objCacheList + 1, objCacheList, sizeof(char *)*(dsc->cache_size -1));
-	    objCacheList[0] = strdup(hashKey);
+	    free(dsc->objCacheList[*(dsc->cache_size) - 1]);
+	    memmove((dsc->objCacheList) + 1, dsc->objCacheList, sizeof(char *) * (*(dsc->cache_size) -1));
+	    dsc->objCacheList[0] = strdup(hashKey);
 	}
     } else {
 	outbuf = (Tcl_Obj *)Tcl_GetHashValue(entry);
@@ -650,7 +643,6 @@ static int send_content(request_rec *r)
     Tcl_Interp *interp;
 
     dtcl_server_conf *dsc;
-    ApacheUpload *upload;
 
     dtcl_interp_globals globals;
     globals.r = r;		/* Assign request to global request var */
@@ -804,7 +796,7 @@ static int send_content(request_rec *r)
     }
 #endif /* USE_ONLY_UPLOAD_COMMAND == 1 */
 
-    get_parse_exec_file(r, 1);
+    get_parse_exec_file(r, dsc, 1);
     /* reset globals  */
     buffer_output = 0;
     headers_printed = 0;
@@ -840,7 +832,6 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     Tcl_Interp *interp;
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
     server_rec *sr;
-
     /* Initialize TCL stuff  */
 
     interp = Tcl_CreateInterp();
@@ -878,7 +869,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 
 #if DBG
     ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"", Tcl_GetStringFromObj(dsc->dtcl_global_init_script, NULL));  /* XXX */
-    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Cache size = \"%d\"", dsc->dtcl_dsc->cache_size);  /* XXX */
+    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Cache size = \"%d\"", *(dsc->cache_size));  /* XXX */
 #endif
 
     if (dsc->dtcl_global_init_script != NULL)
@@ -892,19 +883,19 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     }
 
     /* This is what happens if it is not set by the user */
-    if(dsc->cache_size < 0)
+    if(*(dsc->cache_size) < 0)
     {
 	if (ap_max_requests_per_child != 0)
-	    dsc->cache_size = ap_max_requests_per_child / 2;
+	    *(dsc->cache_size) = ap_max_requests_per_child / 2;
 	else
-	    dsc->cache_size = 10; /* Arbitrary number FIXME */
-	dsc->cache_free = dsc->cache_size;
-    } else if (dsc->cache_size > 0) {
-	dsc->cache_free = dsc->cache_size;
+	    *(dsc->cache_size) = 10; /* Arbitrary number FIXME */
+	*(dsc->cache_free) = *(dsc->cache_size);
+    } else if (*(dsc->cache_size) > 0) {
+	*(dsc->cache_free) = *(dsc->cache_size);
     }
     /* Initializing cache structures */
-    objCacheList = malloc(dsc->cache_size * sizeof(char *));
-    Tcl_InitHashTable(&objCache, TCL_STRING_KEYS);
+    dsc->objCacheList = ap_pcalloc(p, *(dsc->cache_size) * sizeof(char *));
+    Tcl_InitHashTable(dsc->objCache, TCL_STRING_KEYS);
 
     sr = s;
     while (sr)
@@ -979,7 +970,7 @@ static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    dsc->cache_size = strtol(arg, NULL, 10);
+    *(dsc->cache_size) = strtol(arg, NULL, 10);
     return NULL;
 }
 
@@ -1025,6 +1016,10 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
 	newconfig->dtcl_before_script = ddc->dtcl_before_script ? ddc->dtcl_before_script : dsc->dtcl_before_script;
 	newconfig->dtcl_after_script = ddc->dtcl_after_script ? ddc->dtcl_after_script : dsc->dtcl_after_script;
 	newconfig->dtcl_error_script = ddc->dtcl_error_script ? ddc->dtcl_error_script : dsc->dtcl_error_script;
+	newconfig->cache_size = dsc->cache_size;
+	newconfig->cache_free = dsc->cache_free;
+	newconfig->objCacheList = dsc->objCacheList;
+	newconfig->objCache = dsc->objCache;
 	return newconfig;
     }
     return dsc;
@@ -1040,11 +1035,17 @@ static void *create_dtcl_config(pool *p, server_rec *s)
     dsc->dtcl_before_script = NULL;
     dsc->dtcl_after_script = NULL;
     dsc->dtcl_error_script = NULL;
-    dsc->cache_size = -1;
-    dsc->cache_free = 0;
+    
+    /* these are pointers so that they can be passed around...  */
+    dsc->cache_size = ap_pcalloc(p, sizeof(int));
+    dsc->cache_free = ap_pcalloc(p, sizeof(int));
+    *(dsc->cache_size) = -1;
+    *(dsc->cache_free) = 0;
     dsc->upload_max = 0;
-    dsc->upload_dir = "/tmp";
     dsc->server_name = ap_pstrdup(p, s->server_hostname);
+    dsc->upload_dir = "/tmp";
+    dsc->objCacheList = NULL;
+    dsc->objCache = ap_pcalloc(p, sizeof(Tcl_HashTable));
     return dsc;
 }
 
@@ -1077,8 +1078,8 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 
     dsc->dtcl_error_script = overrides->dtcl_error_script ? overrides->dtcl_error_script : base->dtcl_error_script;
 
-    dsc->cache_size = overrides->cache_size ? overrides->cache_size : base->cache_size;
-    dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;
+/*     dsc->cache_size = overrides->cache_size ? overrides->cache_size : base->cache_size;
+    dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;  */
     dsc->upload_max = overrides->upload_max ? overrides->upload_max : base->upload_max;
     dsc->upload_files_to_var = overrides->upload_files_to_var ? overrides->upload_files_to_var : base->upload_files_to_var;
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name;

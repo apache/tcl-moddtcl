@@ -61,19 +61,22 @@ typedef struct {
     Tcl_Obj *dtcl_before_script;        /* script run before each page */
     Tcl_Obj *dtcl_after_script;         /*            after            */
     Tcl_Obj *dtcl_error_script;         /*            for errors */
-    int cache_size;
-    int cache_free;
+    int *cache_size;
+    int *cache_free;
     int upload_max;
     int upload_files_to_var;
     char *server_name;
     char *upload_dir;
+
+    char **objCacheList;    /* Array of cached objects (for priority handling) */
+    Tcl_HashTable *objCache; /* Objects cache - the key is the script name */
 } dtcl_server_conf;
 
 /* eventually we will transfer 'global' variables in here and
    'de-globalize' them */
 
 typedef struct {
-    request_rec *r;		/* request rec */
+    request_rec *r;         /* request rec */
     ApacheRequest *req;     /* libapreq request  */
 } dtcl_interp_globals;
 
@@ -83,7 +86,7 @@ typedef struct {
 } obuff;
 
 int memwrite(obuff *, char *, int);
-int get_parse_exec_file(request_rec *r,  int toplevel);
+int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel);
 int set_header_type(request_rec *, char *);
 int print_headers(request_rec *);
 int print_error(request_rec *, int, char *);

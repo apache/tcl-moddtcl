@@ -36,6 +36,7 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     struct stat finfo;
 
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = dtcl_get_conf(globals->r);
 
     if (objc != 2)
     {
@@ -55,7 +56,7 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	Tcl_AddErrorInfo(interp, Tcl_PosixError(interp));
 	return TCL_ERROR;
     }
-    if (get_parse_exec_file(globals->r, 0) == OK)
+    if (get_parse_exec_file(globals->r, dsc, 0) == OK)
 	return TCL_OK;
     else
 	return TCL_ERROR;
@@ -824,7 +825,7 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 		       "<tr><td><font color=\"#ffffff\">Free cache size: %d</font><br></td></tr>\n"
 		       "<tr><td><font color=\"#ffffff\">PID: %d</font><br></td></tr>\n"
 		       "</table>\n"
-		       "</td></tr></table>\n", dsc->cache_free, getpid());
+		       "</td></tr></table>\n", *(dsc->cache_free), getpid());
 /*     print_headers(globals->r);
     flush_output_buffer(globals->r);  */
     memwrite(&obuffer, tble, strlen(tble));
