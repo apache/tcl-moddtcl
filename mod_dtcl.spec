@@ -3,7 +3,7 @@
 
 Summary: Simple, fast Tcl server side scripting for Apache.
 Name: mod_dtcl
-Version: 0.11.1
+Version: 0.11.5
 Release: 1
 Copyright: Freely distributable and usable
 Group: System Environment/Daemons

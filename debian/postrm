@@ -13,7 +13,7 @@ killconf () {
 	cat /etc/apache/httpd.conf |\
 		 sed 's/^(LoadModule.*mod_dtcl\.so)/#\1/' > $tmpfile
 	mv -f $tmpfile /etc/apache/httpd.conf
-	ask_restart
+	[ -x /usr/sbin/apachectl ] && ask_restart
 }
 
 killconf_ssl () {
@@ -21,7 +21,7 @@ killconf_ssl () {
        cat /etc/apache-ssl/httpd.conf |\
                 sed 's/^(LoadModule.*mod_dtcl\.so)/#\1/' > $tmpfile
        mv -f $tmpfile /etc/apache-ssl/httpd.conf
-       ask_restart_ssl
+       [ -x /usr/sbin/apache-sslctl ] && ask_restart_ssl
 }
 
 # Restart apache if user wants.
@@ -52,8 +52,8 @@ case "$1" in
   remove)
     # This package has been removed, but its configuration has not yet
     # been purged.
-	killconf
-       killconf_ssl
+	[ -e /etc/apache/httpd.conf ] && killconf
+	[ -e /etc/apache-ssl/httpd.conf ] && killconf_ssl
     :
     ;;
   purge | disappear | upgrade | failed-upgrade | abort-upgrade)
@@ -62,10 +62,10 @@ case "$1" in
   abort-install)
     # Back out of an attempt to install this package.  Undo the effects of
     # "preinst install...".  There are two sub-cases.
-    killconf
-    killconf_ssl
+	[ -e /etc/apache/httpd.conf ] && killconf
+	[ -e /etc/apache-ssl/httpd.conf ] && killconf_ssl
     :
-	;;
+    ;;
   *) echo "$0: didn't understand being called with \`$1'" 1>&2
      exit 1;;
 esac

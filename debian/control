@@ -11,4 +11,4 @@ Depends: ${shlibs:Depends}, apache-common (>= 1.3.6)
 Description: Server side Tcl scripting for Apache
  The mod_dtcl Apache module enables the use of Tcl as an HTML-embedded
  scripting language, similar to PHP. It is fast, light, and lets you
- use the extensive codebase of existing Tcl code, on the web.
+ use the extensive code base of existing Tcl code, on the web.

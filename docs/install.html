@@ -137,7 +137,9 @@
 	    <b>http.conf</b><br> <code>LoadModule dtcl_module
 	      /usr/lib/apache/1.3/mod_dtcl.so</code><br> 
 	    This points Apache to the shared object if
-	    mod_dtcl is being used as a loadable module.
+	    mod_dtcl is being used as a loadable module.  In some
+	    cases, adding <code>AddModule mod_dtcl.c</code> seems to
+	      also have positive effects.
 	  </li>
 	  <li>
 	    <b>srm.conf</b><br> 

@@ -75,21 +75,21 @@ case "$1" in
       # We're being installed by an ancient dpkg which doesn't remember
       # which version was most recently configured, or even whether
       # there is a most recently configured version.
-		enable
-               enable_ssl
+	enable
+	enable_ssl
       :
     elif test -z "$2" -o "$2" = "<unknown>"; then
       # The package has not ever been configured on this system, or was
       # purged since it was last configured.
       # DJ: So let's enable the module!
-		enable
-               enable_ssl
+	enable
+	enable_ssl
       :
     else
       # Version $2 is the most recently configured version of this
       # package.
-		ask_restart
-               ask_restart_ssl
+	[ -x /usr/sbin/apachectl ] && ask_restart
+	[ -x /usr/sbin/apache-sslctl ] && ask_restart_ssl
       :
     fi ;;
   abort-upgrade | abort-remove | abort-deconfigure)
