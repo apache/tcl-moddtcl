@@ -321,14 +321,13 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 
     /* Basically, what we are doing here is a Tcl_EvalFile, but
        with the addition of caching code. */
-    char *cmdBuffer = (char *) NULL;
     Tcl_Channel chan = Tcl_OpenFileChannel(interp, r->filename, "r", 0644);
     if (chan == (Tcl_Channel) NULL)
     {
 	Tcl_ResetResult(interp);
 	Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
 			 "\": ", Tcl_PosixError(interp), (char *) NULL);
-	goto error;
+	return TCL_ERROR;
     }
 
     result = Tcl_ReadChars(chan, outbuf, r->finfo.st_size, 1);
@@ -337,21 +336,12 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 	Tcl_Close(interp, chan);
 	Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
 			 "\": ", Tcl_PosixError(interp), (char *) NULL);
-	goto error;
+	return TCL_ERROR;
     }
 
     if (Tcl_Close(interp, chan) != TCL_OK)
-	goto error;
+	return TCL_ERROR;
 
-    /* yuck  */
-    goto end;
-error:
-    if (cmdBuffer != (char *) NULL) {
-	free(cmdBuffer);
-    }
-    return TCL_ERROR;
-
-end:
     return TCL_OK;
 #else
     Tcl_EvalFile(interp, r->filename);
@@ -478,7 +468,7 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
        create it. */
     if (*(dsc->cache_size))
     {
-	hashKey = ap_psprintf(r->pool, "%s%ld%ld%d", r->filename, r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
+	hashKey = ap_psprintf(r->pool, "%s%lx%lx%d", r->filename, r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
 	entry = Tcl_CreateHashEntry(dsc->objCache, hashKey, &isNew);
     }
     if (isNew || *(dsc->cache_size) == 0)
