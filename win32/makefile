@@ -37,7 +37,9 @@ APACHE_SRC = ..\\apache
 # Set APACHE_INC to where the APACHE source include files live. This default
 # should be OK.
 #
-APACHE_INC = $(APACHE_SRC)\\src\\include
+APACHE_INC = -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
+
+
 
 #
 # Set APACHE_LIB and APACHE_DEF to where you'd like a MingW32 compatible
@@ -55,11 +57,11 @@ ROOT_DIR = ..\\
 
 CC = gcc -O3 -fnative-struct -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)\\VERSION`\""
 
-INCLUDES = -I$(TCL_INC) -I$(APACHE_INC)
+INCLUDES = -I$(TCL_INC) $(APACHE_INC)
 LIBS = $(TCL_LIB)\\tcl$(TCL_VERSION).lib -L$(APACHE_LIB) -lapachecore 
 
 APREQ_OBJECTS = apache_cookie.o apache_multipart_buffer.o apache_request.o
-OBJECTS = tcl_commands.o $(APREQ_OBJECTS)
+OBJECTS = tcl_commands.o parser.o channel.o $(APREQ_OBJECTS)
 
 DLL_CFLAGS = -DEAPI=1
 
@@ -76,6 +78,8 @@ DLLWRAP_FLAGS = --def $(DLL_EXP_DEF) \
 #
 # By default we build a .dll file (Apache < 1.3.14)
 #
+# FOR (Apache >= 1.3.17)
+#all : apache_libs $(DLL_SO)
 all : apache_libs $(DLL_DYNAMIC)
 
 dll_style: apache_libs $(DLL_DYNAMIC)
@@ -100,13 +104,22 @@ apache_multipart_buffer.o: $(ROOT_DIR)apache_multipart_buffer.c $(ROOT_DIR)apach
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
 apache_request.o: $(ROOT_DIR)apache_request.c $(ROOT_DIR)apache_request.h
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
-mod_dtcl.o: $(ROOT_DIR)mod_dtcl.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)tcl_commands.h $(ROOT_DIR)apache_request.h
+mod_dtcl.o: $(ROOT_DIR)mod_dtcl.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)tcl_commands.h $(ROOT_DIR)apache_request.h $(ROOT_DIR)parser.h
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -o $@ $<
 tcl_commands.o: $(ROOT_DIR)tcl_commands.c $(ROOT_DIR)tcl_commands.h $(ROOT_DIR)mod_dtcl.h
+	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
+parser.o: $(ROOT_DIR)parser.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)parser.h
+	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
+channel.o: $(ROOT_DIR)channel.c $(ROOT_DIR)mod_dtcl.h $(ROOT_DIR)channel.h
 	$(CC) -c $(DLL_CFLAGS) $(INCLUDES) -D_AP_OS_IS_PATH_ABS_ -o $@ $<
 
 clean:
 	-@rm -f $(DLL_OBJS) $(DLL_DYNAMIC) $(DLL_SO) $(DLL_EXP_LIB)
+
+# FOR (Apache >= 1.3.17)
+#install: $(DLL_SO)
+#	echo Installing mod_dtcl...
+#	-cp $(DLL_SO) $(APACHE_HOME)\\modules
 
 install: $(DLL_DYNAMIC) $(DLL_EXP_LIB)
 	echo Installing mod_dtcl...
@@ -125,3 +138,4 @@ apache_libs:
 	dlltool --def $(APACHE_DEF) --dllname ApacheCore.dll \
 		--output-lib $(TEMP_LIBS)\libapachecore.a -k
 	
+

@@ -1,3 +1,11 @@
+libapache-mod-dtcl (0.11.4-1) unstable; urgency=low
+
+  * Fixed bug in Parse command.
+  
+  * Added Debian SSL config stuff from János Holányi (closes: #115333)
+
+ -- David N. Welton <davidw@debian.org>  Mon, 15 Oct 2001 20:43:40 +0200
+
 libapache-mod-dtcl (0.11.3-1) unstable; urgency=low
 
   * I18n updates.
