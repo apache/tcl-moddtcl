@@ -1095,7 +1095,7 @@ const handler_rec dtcl_handlers[] =
 
 const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript \"tcl source code\""},
+    {"Dtcl_Script", set_script, NULL, OR_FILEINFO, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript \"tcl source code\""},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
     {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},
