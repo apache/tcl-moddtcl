@@ -1,6 +1,6 @@
 #!/usr/bin/tclsh
 
-# mod_dtcl test suite, by David N. Welton <davidw@linuxcare.com>
+# mod_dtcl test suite, by David N. Welton <davidw@apache.org>
 
 # $Id$ 
 
