@@ -172,6 +172,7 @@ typedef struct {
     Tcl_Obj *dtcl_before_script;        /* script run before each page */
     Tcl_Obj *dtcl_after_script;         /*            after            */
     int dtcl_cache_size;
+    char *server_name; 
 } dtcl_server_conf;
 
 #define GETREQINTERP(req) ((dtcl_server_conf *)ap_get_module_config(req->server->module_config, &dtcl_module))->server_interp
@@ -1412,7 +1413,6 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
 	char inside = 0;	/* are we inside the starting/ending delimiters  */
 	
 	dtcl_server_conf *dsc = NULL;
-	void *sconf = r->server->module_config;
 	const char *strstart = STARTING_SEQUENCE;
 	const char *strend = ENDING_SEQUENCE;
 
@@ -1422,7 +1422,7 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
 
 	FILE *f = NULL;
 
-	dsc = (dtcl_server_conf *) ap_get_module_config(sconf, &dtcl_module);
+	dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
 	if (!(f = ap_pfopen(r->pool, filename, "r")))
 	{
 	    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
@@ -1730,26 +1730,17 @@ static int send_content(request_rec *r)
 static void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
-    void *sconf = s->module_config;  /* get module configuration */
     Tcl_Channel achan;
     Tcl_Interp *interp;
-    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(sconf, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
     server_rec *sr;
 
     /* Initialize TCL stuff  */
 
-    /* Create TCL commands to deal with Apache's BUFFs. */
-
     interp = Tcl_CreateInterp();
-    
-    /* FIXME: this bit needs to change for per-server conf things in some way */
-    sr = s;
-    while (sr)
-    {
-	dsc->server_interp = interp;
-	sr = sr->next;
-    }
+    dsc->server_interp = interp; /* root interpreter */    
 
+    /* Create TCL commands to deal with Apache's BUFFs. */
     achan = Tcl_CreateChannel(&Achan, "apacheout", NULL, TCL_WRITABLE);
 
     system_encoding = Tcl_GetEncoding(NULL, "iso8859-1"); /* FIXME */
@@ -1816,6 +1807,31 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     /* Initializing cache structures */
     objCacheList = malloc(cacheSize * sizeof(char *));
     Tcl_InitHashTable(&objCache, TCL_STRING_KEYS);
+
+    sr = s;
+    while (sr)
+    {
+	/* Ok, this stuff should set up slave interpreters for other
+           virtual hosts */
+	dtcl_server_conf *mydsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
+	if (!mydsc->server_interp)
+	{
+	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
+	    Tcl_CreateAlias(mydsc->server_interp, "buffer_add", interp, "buffer_add", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "hputs", interp, "hputs", 0, NULL);	    
+	    Tcl_CreateAlias(mydsc->server_interp, "buffered", interp, "buffered", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "headers", interp, "headers", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "hgetvars", interp, "hgetvars", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "include", interp, "include", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "parse", interp, "parse", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "hflush", interp, "hflush", 0, NULL);
+	    Tcl_CreateAlias(mydsc->server_interp, "dtcl_info", interp, "dtcl_info", 0, NULL);
+	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
+	    Tcl_RegisterChannel(mydsc->server_interp, achan);
+	}
+	mydsc->server_name = ap_pstrdup(p, sr->server_hostname);
+	sr = sr->next;
+    }
 }
 
 void dtcl_init_handler(server_rec *s, pool *p)
@@ -1823,14 +1839,14 @@ void dtcl_init_handler(server_rec *s, pool *p)
 #if THREADED_TCL == 0
     tcl_init_stuff(s, p);
 #endif
-    ap_add_version_component("Mod_dtcl " DTCL_VERSION);
+    ap_add_version_component("mod_dtcl");
 }
 
 static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)
 {
     Tcl_Obj *objarg;
     server_rec *s = cmd->server;
-    dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
 
     if (arg == NULL || arg2 == NULL)
 	return "Mod_Dtcl Error: Dtcl_Script requires two arguments";
@@ -1838,15 +1854,15 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
     objarg = Tcl_NewStringObj(arg2, -1);
     Tcl_AppendToObj(objarg, "\n", 1);
     if (strcmp(arg, "GlobalInitScript") == 0) {
-	conf->dtcl_global_init_script = objarg;
+	dsc->dtcl_global_init_script = objarg;
     } else if (strcmp(arg, "ChildInitScript") == 0) {
-	conf->dtcl_child_init_script = objarg;
+	dsc->dtcl_child_init_script = objarg;
     } else if (strcmp(arg, "ChildExitScript") == 0) {
-	conf->dtcl_child_exit_script = objarg;
+	dsc->dtcl_child_exit_script = objarg;
     } else if (strcmp(arg, "BeforeScript") == 0) {
-	conf->dtcl_before_script = objarg;
+	dsc->dtcl_before_script = objarg;
     } else if (strcmp(arg, "AfterScript") == 0) {
-	conf->dtcl_after_script = objarg;
+	dsc->dtcl_after_script = objarg;
     } else {
 	return "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript";
     }
@@ -1856,8 +1872,8 @@ static const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2
 static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *conf = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
-    conf->dtcl_cache_size = strtol(arg, NULL, 10);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dsc->dtcl_cache_size = strtol(arg, NULL, 10);
     return NULL;
 }
 
@@ -1879,34 +1895,54 @@ static const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
 
 static void *create_dtcl_config(pool *p, server_rec *s)
 {
-    dtcl_server_conf *dts = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
-    dts->dtcl_global_init_script = NULL;
-    dts->dtcl_child_init_script = NULL;
-    dts->dtcl_child_exit_script = NULL;
-    dts->dtcl_before_script = NULL;
-    dts->dtcl_after_script = NULL;
-    dts->dtcl_cache_size = 0;
-    return dts;
+    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
+
+    dsc->dtcl_global_init_script = NULL;
+    dsc->dtcl_child_init_script = NULL;
+    dsc->dtcl_child_exit_script = NULL;
+    dsc->dtcl_before_script = NULL;
+    dsc->dtcl_after_script = NULL;
+    dsc->dtcl_cache_size = 0;
+    dsc->server_name = ap_pstrdup(p, s->server_hostname);
+    return dsc;
 }
 
 static void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 {
-    dtcl_server_conf *base = (dtcl_server_conf *) basev, *overrides = (dtcl_server_conf *) overridesv;
-    return overrides->dtcl_global_init_script ? overrides : base;
+    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
+    dtcl_server_conf *base = (dtcl_server_conf *) basev;
+    dtcl_server_conf *overrides = (dtcl_server_conf *) overridesv;
+
+    dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
+    dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ? overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
+    dsc->dtcl_child_init_script = overrides->dtcl_child_init_script ? overrides->dtcl_child_init_script : base->dtcl_child_init_script;     
+    dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ? overrides->dtcl_child_exit_script : base->dtcl_child_exit_script;
+    dsc->dtcl_before_script = overrides->dtcl_before_script ? overrides->dtcl_before_script : base->dtcl_before_script;
+    dsc->dtcl_after_script = overrides->dtcl_after_script ? overrides->dtcl_after_script : base->dtcl_after_script;
+    dsc->dtcl_cache_size = overrides->dtcl_cache_size ? overrides->dtcl_cache_size : base->dtcl_cache_size;
+    dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name; 
+    return dsc;
 }
 
 static void dtcl_child_init(server_rec *s, pool *p)
 {
-    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
+    server_rec *sr;
+    dtcl_server_conf *dsc;
 
 #if THREADED_TCL == 1
     tcl_init_stuff(s, p);
 #endif
 
-    if (dsc->dtcl_child_init_script != NULL)
-	if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
-	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
-			 "Problem running child init script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_init_script, NULL));
+    sr = s;
+    while(sr)
+    {	
+	dsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
+	if (dsc->dtcl_child_init_script != NULL)
+	    if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
+		ap_log_error(APLOG_MARK, APLOG_ERR, s,
+			     "Problem running child init script: %s", Tcl_GetString(dsc->dtcl_child_init_script));
+	sr = sr->next;
+    }
 }
 
 static void dtcl_child_exit(server_rec *s, pool *p)
