@@ -1,9 +1,0 @@
-Two sets of files are included here, from two attempts to make
-mod_dtcl work under windows.
-
-Jan Nijtman succesfully compiled mod_dtcl with VC++ 5, but says "I
-never got to the point that it actually runs on Windows".  See
-README.vc++.
-
-Craig Huckabee has succesfully compiled and run mod_dtcl using the
-MingW32 environment.  Instructions in README.mingw32.
