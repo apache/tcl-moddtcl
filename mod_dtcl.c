@@ -918,16 +918,20 @@ static int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Ob
 // if ((end + 2 != NULL) && !strncmp(end + 2, "--", 2))
 
     /* search buffer for \r\n, set end to location */
-#define CRLFSEARCH() \
-    for (i = 0; i < buflen - 1; i ++) {\
-	if (baseptr[i] == '\r') {\
-	    if (baseptr[i+1] == '\n') {\
-		end = &baseptr[i];\
-                break;\
-	    }\
-	}\
+static char *crlfsearch(char *ptr, unsigned int len)
+{
+    unsigned int i;
+    char *end = NULL;
+    for (i = 0; i < len - 1; i ++) {
+	if (ptr[i] == '\r') {
+	    if (ptr[i+1] == '\n') {
+		end = &ptr[i];
+                break;
+	    }
+	}
     }
-
+    return end;
+}
 /* For multipart/form-data */
 #define CONTENT_DISP "Content-Disposition: form-data;"
 #define CONTENT_DISP_LEN strlen(CONTENT_DISP)
@@ -938,7 +942,7 @@ static int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Ob
 
 static int multipart(char *inargs, request_rec *r, char *boundary, int length, int length_read)
 {
-    static int buflen = 0;
+    static unsigned int buflen = 0;
     static int boundarysz = 0;
     static int state = 0;     /*  
 				  0: normal
@@ -965,8 +969,6 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
     int retval = 0;
     int linelen = 0;
     
-    register unsigned int i = 0;
-
     /* init stuff */
     if (boundarysz == 0)
 	boundarysz = strlen(boundary);
@@ -990,14 +992,14 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
     }
 
     /* search base for \r\n, set end to location */
-    CRLFSEARCH();
+    end = crlfsearch(baseptr, buflen);
 
     while (end)
     {
 	line = baseptr;
 	linelen = end - baseptr;
  	baseptr = end + 2;
-	buflen -= baseptr - line;
+	buflen -= (linelen + 2);
 
 	/* boundary is preceded by "--" */
 	if (!strncmp (line, "--", 2) && !strncmp(line + 2, boundary, boundarysz)) 
@@ -1125,8 +1127,10 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		{
 		    if (end + 4 + boundarysz != NULL) /* make sure not to overrun */
 			if (strncmp (end+2, "--", 2) && strncmp(end + 4, boundary, boundarysz))
+			{
+//			    buflen -= 2;
 			    sz += 2; /* reset stuff if we get \r\n in the middle of a file upload */
-
+			}
 		    if (upload_files_to_var != 0)
 		    {
 			if (acumlen == 0)
@@ -1141,9 +1145,10 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		}
 	    } 
 	}
-
-	end = NULL;
-	CRLFSEARCH();
+	baseptr = dtcl_memdup(baseptr, buflen);
+	free(buffer);
+	buffer = baseptr;
+	end = crlfsearch(baseptr, buflen);
     }
 
     if (buflen && state == 2)
