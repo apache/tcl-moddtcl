@@ -1,0 +1,27 @@
+Information about attempting to build mod_dtcl under VC++:
+
+These files are Jan Nijtmans' <mailto://j.nijtmans@chello.nl>, and are the
+following:
+
+- mod_dtcl.dsw
+    workspace for VC++ 5.0
+- mod_dtcl.dsp
+    project file for VC++ 5.0
+- mod_dtcl.def
+    export definition file.
+
+Any questions should be sent to him.
+
+He also has the following comment:
+
+  However, although everything compiles now, I never got to the point
+  that it actually runs on Windows. The problem is that the ap_error()
+  function (if I remember correctly, I don't have the code at hand
+  now) in Apache still has the wrong signature, even though in the
+  symbol is exported now. I even recompiled Apache after fixing this,
+  but still then there is a problem during the initializaton of Tcl
+  which prevents it from running. I never found out what was the cause
+  of this problem, and due to other obligations I now barely have the
+  time to continue the search. The reason I still contributed the
+  makefiles to you was that although it wouldn't work yet, at least it
+  would be a start for anyone trying to do the same thing as I did.

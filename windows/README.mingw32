@@ -1,0 +1,89 @@
+Steps for building mod_dtcl under NT for Apache with MingW32 
+(http://www.mingw.org/). 
+
+1)  Get Apache for NT, I used version 1.3.12.  You can use the binary release 
+or build it from source.  I built from source because I needed to also include
+mod_ssl.  Note that I used VC++ to build Apache - they don't support MingW32 
+yet AFAIK.
+
+2)  Get mod_dtcl.  Copy my makefile into place.  Edit the makefile to reflect 
+your environment.  By default Apache (either built from scratch or the binary
+release) puts the source under:
+
+	 C:\Program Files\Apache Group\Apache\src
+
+The lib directory at
+
+	C:\Program Files\Apache Group\Apache\lib
+
+is generally empty in either case - you'll be putting your import library for 
+Apache there (we'll get to that in a minute).
+
+3)  Apply the diffs for mod_dtcl and Apache.  The diff for Apache wraps a few 
+declarations and one #include directive in the os.h file that aren't needed or 
+used with the MingW32 compiler.  The diff for mod_dtcl just wraps the threaded 
+TCL declaration.  I used GNU patch to do this with :
+
+	patch -c -b < os.h.diff
+	patch -c -b < mod_dtcl.c.diff
+
+4)  You'll need to make import libraries for Tcl and Apache.  See 
+http://www.mingw.org/mingwfaq.shtml for the background on this.  I did it 
+like this :
+
+For TCL :
+	If you compiled Tcl from scratch with VC++:
+	
+	cd <tcl source directory>\win\release
+	echo EXPORTS > c:\temp\tcl83.def
+	nm tcl83.exp | grep ' U _' | sed 's/.* U _//' >> c:\temp\tcl83.def		
+	cd <tk source directory>\win\release
+	echo EXPORTS > c:\temp\tk83.def
+	nm tk83.exp | grep ' U _' | sed 's/.* U _//' >> c:\temp\tk83.def		
+
+	Otherwise if using the Scriptics binary release do this :
+
+	cd c:\Program Files\Tcl\lib
+	echo EXPORTS > c:\temp\tcl83.def
+	echo EXPORTS > c:\temp\tk83.def
+	nm tcl83.lib | grep ' T _' | sed 's/.* T _//' >> c:\temp\tcl83.def
+	nm tk83.lib | grep ' T _' | sed 's/.* T _//' >> c:\temp\tk83.def
+
+	Then do this (dlltool commands are all one line):
+
+	cd c:\Program Files\Tcl\bin
+	dlltool --def c:\temp\tcl83.def --dllname tcl83.dll \
+		--output-lib ..\lib\libtcl83.a
+	dlltool --def c:\temp\tk83.def --dllname tk83.dll \
+		--output-lib ..\lib\libtk83.a
+	
+For Apache :
+
+	Use the ApacheCore.def file I've included* and do this :
+	cd C:\Program Files\Apache Group\Apache
+	dlltool --dllname ApacheCore.dll --def c:\temp\ApacheCore.def \
+		--output-lib lib\libapachecore.a -k
+	
+	*This file was modified from one created by Apache+mod_ssl, it may 
+	need to be tweaked for plain vanilla Apache or for other module 
+	installs that make source changes like mod_ssl.
+
+5)  Go back to where you've put mod_dtcl's sources at and run make.  There 
+will be some warnings about a redefinition - you can ignore it. You should be
+left with a file called ApacheModuleDtcl.dll.   
+
+6)  Run make install.  Make the changes to your Apache configuration as 
+described on the mod_dtcl documentation, and you are off.
+
+Notes :
+
+	-- I'm pretty sure Tcl needs to be in the path of the web server; I 
+	always add it to the system path.
+	-- These instructions assume you have the MingW32 gcc setup as well 
+	as a good collection of	GNU tools on your NT machine (sed, grep, etc).
+	They also assume you have Tcl setup.
+	-- I've tried my best to make these instructions error free but
+	mistakes are possible.  
+
+Good Luck,
+Craig

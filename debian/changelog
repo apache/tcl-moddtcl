@@ -1,0 +1,259 @@
+libapache-mod-dtcl (0.8.1-1) unstable; urgency=low
+
+  * Put some code in as a workaround for systems with Tcl compiled against
+    threads.
+
+ -- David N. Welton <davidw@efn.org>  Thu, 22 Jun 2000 01:42:26 +0200
+
+libapache-mod-dtcl (0.8.0-1) unstable; urgency=low
+
+  * Added information about building on HPUX.
+  * Added support for .tcl files.
+  * Fixed bug in HGetVars which manifests itself only when content
+    negotiation is used.
+  * Updated documentation.
+
+ -- David N. Welton <davidw@efn.org>  Tue, 16 May 2000 19:00:05 +0200
+
+libapache-mod-dtcl (0.7.5-1) unstable; urgency=low
+
+  * Changed hputs to use "" instead of {}, so that { and } may be escaped
+    with backslashes.
+  
+  * Changed output format for errors.
+
+ -- David N. Welton <davidw@efn.org>  Wed, 19 Apr 2000 17:49:47 +0200
+
+libapache-mod-dtcl (0.7.3-2) frozen unstable; urgency=low
+
+  * Removed "code2html" target from build target.  
+  * Fixes #58431.
+
+ -- David N. Welton <davidw@efn.org>  Fri,  3 Mar 2000 13:11:23 +0100
+
+libapache-mod-dtcl (0.7.3-1) frozen unstable; urgency=low
+
+  * Fixes GET argument parsing bug.
+  * Changed argument parsing to create one list and avoid sublists.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 22 Jan 2000 20:46:34 -0800
+
+libapache-mod-dtcl (0.7.0-2) unstable; urgency=low
+
+  * Made hputs, include, and buffer_add commands safe for binary and
+    sparse data.
+  
+  * Now able to output different mime types.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 18 Dec 1999 18:50:29 -0800
+
+libapache-mod-dtcl (0.7.0-1) unstable; urgency=low
+
+  * Major overhaul of header and buffering system.
+  * Several new commands.
+
+ -- David N. Welton <davidw@efn.org>  Sun,  5 Dec 1999 21:24:23 -0800
+
+libapache-mod-dtcl (0.6.4-2) unstable; urgency=low
+
+  * Fixed Lintian problems:
+  * Set and remove links between /usr/doc and /usr/share/doc.
+  * Added dh_installchangelogs.
+  
+ -- David N. Welton <davidw@efn.org>  Sun, 14 Nov 1999 15:15:51 -0800
+
+libapache-mod-dtcl (0.6.4-1) unstable; urgency=low
+
+  * Patch from Jan Nijtman to compile mod_dtcl under windows and eliminate
+    strings.h.  Included windows/ directory in sources.
+
+ -- David N. Welton <davidw@efn.org>  Sat,  6 Nov 1999 09:54:34 -0800
+
+libapache-mod-dtcl (0.6.3-1) unstable; urgency=low
+
+  * Fixed small bug in variable decoding (Patrick Diamond).
+
+ -- David N. Welton <davidw@efn.org>  Mon, 18 Oct 1999 07:27:49 -0700
+
+libapache-mod-dtcl (0.6.2-1) unstable; urgency=low
+
+  * Added Patrick Diamond's fix for remnant namespaces.
+  * Simplified handling of list CGI variables (thanks to Andrew N. Nefedkin)
+
+ -- David N. Welton <davidw@efn.org>  Fri, 13 Aug 1999 21:23:52 -0700
+
+libapache-mod-dtcl (0.6.1-2) unstable; urgency=low
+
+  * Now, "examples.ttml?a=1&a=2&a=3" creates a Tcl list, instead of
+   overwriting 'a' with the last value.
+
+ -- David N. Welton <davidw@efn.org>  Tue,  3 Aug 1999 23:49:44 -0700
+
+libapache-mod-dtcl (0.6.0-1) unstable; urgency=low
+
+  * Created Parse Tcl command, to enable parsing of ttml files from
+   within scripts.
+
+  * Changed to Apache alloc commands in parseargs.
+
+  * Fixed bug in GET variable handling (http://somesite/foo.ttml?foo
+   now works).
+
+  * Added child_init and child_exit handlers and directives.
+
+ -- David N. Welton <davidw@efn.org>  Thu, 29 Jul 1999 20:54:23 -0700
+
+libapache-mod-dtcl (0.5.4-1) unstable; urgency=low
+
+  * Fixed bug in POST code.
+
+ -- David N. Welton <davidw@efn.org>  Mon, 14 Jun 1999 22:39:08 -0700
+
+libapache-mod-dtcl (0.5.3-1) unstable; urgency=low
+
+  * Fixed problem with POST data.
+  * Integrated Patrick Diamond's new HGetVars.c.
+
+ -- David N. Welton <davidw@efn.org>  Tue,  8 Jun 1999 23:55:40 -0700
+
+libapache-mod-dtcl (0.5.2-1) unstable; urgency=low
+
+  * Small fix from Paolo Brutti - change 'c' to char in parser.
+
+ -- David N. Welton <davidw@efn.org>  Wed, 21 Apr 1999 20:12:44 -0700
+
+libapache-mod-dtcl (0.5.1-1) unstable; urgency=low
+
+  * cacheSize defaults to ap_max_requests_per_child / 2.
+
+ -- David N. Welton <davidw@efn.org>  Tue, 20 Apr 1999 12:27:18 -0700
+
+libapache-mod-dtcl (0.5.0-1) unstable; urgency=low
+
+  * Added "testdtcl", for static testing of ttml pages.
+  * Added new Tcl command "dtcl_info", which prints some info about the
+  internal state.
+  * Added "Dtcl_CacheSize" global configuration.
+  * Changed "GlobalScript" to "Dtcl_GlobalScript".
+  * Added Paolo Brutti's changes, which include:
+  * More complete use of Tcl objects.
+  * Caching system.  This does not cache the results of the scripts, just
+  the Tcl objects resulting from reading the files in and parsing them.
+  * Use of ap_ commands to manage memory.
+  * The Include command is implemented with Tcl_ file interface, which
+  improves both portability an error messaging.
+  * All "wrong args" are implemented with the standard Tcl_WrongNumArgs call.
+  * Thanks Paolo!
+	
+ -- David N. Welton <davidw@efn.org>  Sun, 14 Mar 1999 14:47:03 -0800
+
+libapache-mod-dtcl (0.4.6-1) unstable; urgency=low
+
+  * Added 'setcookie' command.
+  * Dramatic improvements to dtcl-mode.el, allowing you to automatically
+  switch between TCL and HTML modes!
+  * Initiated switch to Tcl 'objects'.
+  * Beginings of a user manual in use.html.
+	
+ -- David N. Welton <davidw@efn.org>  Sun, 14 Mar 1999 14:47:03 -0800
+
+libapache-mod-dtcl (0.4.5-1) unstable; urgency=low
+
+  * Changed 'cgi.tcl' to 'dtcl.tcl', and added Rolf Ade's improvements.
+  * Added documentation page for dtcl.tcl.
+  * Updated documentation.
+
+ -- David N. Welton <davidw@efn.org>  Wed, 24 Feb 1999 23:33:20 -0800
+
+libapache-mod-dtcl (0.4.4-1) unstable; urgency=low
+
+  * Fixed minor bugs in POST code.
+  * Added dtcl-mode.el.
+  * Documentation changes: updates, and explanation of how to compile
+    mod_dtcl as a static module.
+  * Added 'Configure' help to mod_dtcl.c
+  * Added Rolf Ade's preliminary cgi.tcl.  Please note that this is
+    *alpha* software.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 20 Feb 1999 12:51:51 -0800
+
+libapache-mod-dtcl (0.4.3-1) unstable; urgency=low
+
+  * Fixed pointer bug in ptchar and ptstr.
+
+ -- David N. Welton <davidw@efn.org>  Wed,  3 Feb 1999 21:00:02 -0800
+
+libapache-mod-dtcl (0.4.2-1) unstable; urgency=low
+
+  * Changes in documentation, added several files, including 'INSTALL',
+    benchmark.html, and several others.
+  * Fixed handling of <Directory> Options, so no changes are needed in the
+    config files.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 30 Jan 1999 13:55:14 -0800
+
+libapache-mod-dtcl (0.4.1-1) unstable; urgency=low
+
+  * Fixed minor bugs in namespace creation.
+
+ -- David N. Welton <davidw@efn.org>  Mon, 11 Jan 1999 22:35:20 -0800
+
+libapache-mod-dtcl (0.4-1) unstable; urgency=low
+
+  * Added '-error' to hputs for tcl error reporting.
+  * Dispensed with new interpreter per request in favor of a new namespace
+  at each request, and a global interpreter.
+  * Added config option for global startup script.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 12 Dec 1998 16:05:20 -0800
+
+libapache-mod-dtcl (0.3-1) frozen unstable; urgency=low
+
+  * Added 'include' function.
+  * Cleaned up comments, documentation.
+  * Added patch by (rolf@pointsman.storz.de), which eliminates need for global_request_rec, and instead makes use of ClientData.
+  * Added preliminary POST functionality, copied, and modified, from mod_cgi.
+  * Compiled under Apache 1.3.3.
+	
+ -- David N. Welton <davidw@efn.org>  Mon, 23 Nov 1998 22:54:03 -0800
+
+libapache-mod-dtcl (0.2-3) unstable; urgency=low
+
+  * Fixed a few bugs affecting portability.
+
+ -- David N. Welton <davidw@efn.org>  Wed, 14 Oct 1998 23:05:40 -0700
+
+libapache-mod-dtcl (0.2-2) unstable; urgency=low
+
+  * Recompiled for Apache 1.3.2.
+
+ -- David N. Welton <davidw@efn.org>  Sun, 11 Oct 1998 00:15:33 -0700
+
+libapache-mod-dtcl (0.2-1) unstable; urgency=low
+
+  * Added description to control file.
+  * Updated for Apache 1.3.1.
+
+ -- David N. Welton <davidw@efn.org>  Fri,  4 Sep 1998 16:18:00 -0700
+
+libapache-mod-dtcl (0.1-3) unstable; urgency=low
+
+  * Added a few things to the docs. 
+
+ -- David N. Welton <davidw@efn.org>  Fri, 24 Jul 1998 10:35:20 -0700
+
+libapache-mod-dtcl (0.1-2) unstable; urgency=low
+
+  * Tweaked postinst file, changed dtcl.ttml to .html.
+
+ -- David N. Welton <davidw@efn.org>  Sat, 18 Jul 1998 11:14:48 -0700
+
+libapache-mod-dtcl (0.1-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- David N. Welton <davidw@efn.org>  Fri, 10 Jul 1998 20:01:35 -0700
+
+Local variables:
+mode: debian-changelog
+End:

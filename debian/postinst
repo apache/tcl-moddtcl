@@ -1,0 +1,89 @@
+#!/bin/bash
+# postinst for libapache-mod-dtcl, based on:
+# postinst for libapache-mod-perl, based on:
+# postinst.skeleton
+# Skeleton maintainer script showing all the possible cases.
+# Written by Charles Briscoe-Smith, March-April 1998.  Public Domain.
+
+# Abort if any command returns an error value
+set -e
+
+# This script is called as the last step of the installation of the
+# package.  All the package's files are in place, dpkg has already done
+# its automatic conffile handling, and all the packages we depend of
+# are already fully installed and configured.
+
+# DJ
+# This function may enable our module.
+enable () {
+	[ -f /etc/apache/httpd.conf ] || exit 0
+	if grep '^LoadModule.*mod_dtcl\.so' /etc/apache/httpd.conf 2>&1 >/dev/null
+	then
+		return 0
+	fi
+	echo -n "A new Apache module has been installed.  Reconfigure apache [Y/n]? "
+	read CONFIG
+	if [ ".$CONFIG" == ".n" -o ".$CONFIG" == ".N" ]
+	then
+		return 0
+	fi
+	[ -x /usr/sbin/apacheconfig ] && /usr/sbin/apacheconfig --force-modules
+	return 0
+}
+
+# Restart apache if user wants.
+ask_restart () {
+	echo -n "An Apache module has been modified.  Restart apache [Y/n]? "
+	read CONFIG
+	if [ ".$CONFIG" != ".n" -a ".$CONFIG" != ".N" ]
+	then
+		/usr/sbin/apachectl restart
+	fi
+}
+
+case "$1" in
+  configure)
+    # Configure this package.  If the package must prompt the user for
+    # information, do it here.  There are three sub-cases.
+    :
+    if test "${2+set}" != set; then
+      # We're being installed by an ancient dpkg which doesn't remember
+      # which version was most recently configured, or even whether
+      # there is a most recently configured version.
+		enable
+      :
+    elif test -z "$2" -o "$2" = "<unknown>"; then
+      # The package has not ever been configured on this system, or was
+      # purged since it was last configured.
+      # DJ: So let's enable the module!
+		enable
+      :
+    else
+      # Version $2 is the most recently configured version of this
+      # package.
+		ask_restart
+      :
+    fi ;;
+  abort-upgrade | abort-remove | abort-deconfigure)
+  	:
+    ;;
+  *) echo "$0: didn't understand being called with \`$1'" 1>&2
+     exit 1;;
+esac
+
+if [ "$1" = "configure" ]; then
+    if [ -d /usr/doc -a ! -e /usr/doc/libapache-mod-dtcl -a -d /usr/share/doc/libapache-mod-dtcl ]; then
+	ln -sf ../share/doc/libapache-mod-dtcl /usr/doc/libapache-mod-dtcl
+    fi
+fi
+
+cat <<EOF
+You must add the following line to your config files:
+http.conf:
+LoadModule dtcl_module mod_dtcl.so
+
+srm.conf:
+AddType application/x-httpd-tcl .ttml
+EOF
+
+exit 0

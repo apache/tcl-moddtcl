@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [ \( "$1" = "upgrade" -o "$1" = "remove" \) -a -L /usr/doc/libapache-mod-dtcl ]; then
+    rm -f /usr/doc/libapache-mod-dtcl
+fi

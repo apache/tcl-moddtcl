@@ -1,0 +1,22 @@
+<table>
+<+
+# Creates a table that displays the times in various locations in the
+# world
+
+headers set Refresh 60
+
+set offices [ list "US/Pacific" "Canada/Eastern" "Universal" "Europe/Rome" "Japan" "Australia/Canberra" ]
+
+set tzsave [ clock format [clock seconds] -format %Z ]
+set tm [ clock seconds ]
+set clockformat "%a %e %b %Y %r %Z%z"
+
+foreach office $offices {
+    hputs "<tr><th align=left>$office</th><td><tt>"
+    set env(TZ) "$office"
+    hputs [ clock format $tm -format "$clockformat" ]
+    hputs "</tt></td></tr>"
+}
+unset env(TZ)
++>
+</table>

@@ -1,0 +1,52 @@
+#! /bin/sh
+# postrm.skeleton
+# Skeleton maintainer script showing all the possible cases.
+# Written by Charles Briscoe-Smith, March-April 1998.  Public Domain.
+
+# Abort if any command returns an error value
+set -e
+
+# DJ: function to comment us out in httpd.conf
+killconf () {
+	tmpfile=/etc/apache/httpd.conf.tmp.$$
+	cat /etc/apache/httpd.conf |\
+		 sed 's/^(LoadModule.*mod_dtcl\.so)/#\1/' > $tmpfile
+	mv -f $tmpfile /etc/apache/httpd.conf
+	ask_restart
+}
+
+# Restart apache if user wants.
+ask_restart () {
+	echo -n "An Apache module has been modified.  Restart apache [Y/n]? "
+	read CONFIG
+	if [ ".$CONFIG" != ".n" -a ".$CONFIG" != ".N" ]
+	then
+		/usr/sbin/apachectl restart || true
+	fi
+}
+                                                        # This script is called twice during the removal of the package; once
+# after the removal of the package's files from the system, and as
+# the final step in the removal of this package, after the package's
+# conffiles have been removed.
+
+case "$1" in
+  remove)
+    # This package has been removed, but its configuration has not yet
+    # been purged.
+	killconf
+    :
+    ;;
+  purge | disappear | upgrade | failed-upgrade | abort-upgrade)
+    :
+    ;;
+  abort-install)
+    # Back out of an attempt to install this package.  Undo the effects of
+    # "preinst install...".  There are two sub-cases.
+    killconf
+    :
+	;;
+  *) echo "$0: didn't understand being called with \`$1'" 1>&2
+     exit 1;;
+esac
+
+exit 0

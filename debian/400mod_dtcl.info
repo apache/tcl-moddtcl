@@ -1,0 +1,8 @@
+LoadModule: dtcl_module /usr/lib/apache/1.3/mod_dtcl.so
+Directives:
+ GlobalScript
+ Dtcl_GlobalScript
+ Dtcl_CacheSize
+ Dtcl_ChildInitScript
+ Dtcl_ChildExitScript
+Description: Simple, fast Tcl server side scripting.
