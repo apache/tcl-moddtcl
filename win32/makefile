@@ -17,19 +17,6 @@
 GCCVER = 3
 
 #
-# Threaded flag - set this and mod_dtcl will link against a 
-# threaded version of Tcl.  You MUST build a threaded version of Tcl for
-# this to work - ActiveState's binary Tcl distribution does not include 
-# threads!
-#
-# This overrides the THREADED_TCL flag in mod_dtcl.h !
-#
-#THREADED ?= YES
-#
-# 
-THREADED ?= NO
-
-#
 # I use this as a pointer to a good temporary location. 
 # The default works for most people.  You won't need any of the cruft
 # we create while building.
@@ -87,15 +74,8 @@ else
 NATIVESTRUCT ?= -fnative-struct
 endif
 
-ifeq ($(THREADED), YES)
 TCL_LIB = $(TCL_HOME)/lib/tcl$(TCL_VERSION)t.lib
-CFLAGS = $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\"" -DTHREADED_TCL=1
-else
-TCL_LIB = $(TCL_HOME)/lib/tcl$(TCL_VERSION).lib
-CFLAGS = $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\""
-endif
-
-
+CFLAGS = $(NATIVESTRUCT) -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)/VERSION`\"" -DTCL_THREADS=1
 CC = gcc $(CFLAGS)
 LIBS = $(TCL_LIB) -L$(APACHE_LIB) -lapachecore
 INCLUDES = $(TCL_INC) $(APACHE_INC)

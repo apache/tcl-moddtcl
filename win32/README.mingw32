@@ -12,6 +12,9 @@ are your Apache sources and object files, etc.  The latest version of
 the makefile has a 'bin_style' target that will allow the use of a binary
 only install of Apache - see below and the makefile notes for more info.
 
+	You must now have a threaded version of Tcl around.  You must build this
+yourself as ActiveState's distribution does not include threads!
+
 	You may also specify values for these variables from the command line,
 like this :
 
@@ -21,9 +24,6 @@ like this :
 	The latest version of the makefile has a 'bin_style' target that will 
 	allow the use of a binary-only install of Apache - see below and the 
     makefile notes for more info.
-
-	NOTE:  The makefile now has support for a threaded Tcl build - see
-	the makefile for details. 
 
 3)  Apply the diffs for Apache.  The diff for Apache wraps a few declarations 
 and one #include directive in the os.h file that aren't needed or used with the MingW32 compiler.  
