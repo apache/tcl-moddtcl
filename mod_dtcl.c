@@ -86,19 +86,8 @@ Tcl_Encoding system_encoding;    /* Default encoding  */
    management stuff on obuff - malloc, free, etc., because I couldn't
    get it to work well with the apache functions - davidw */
 
-obuff obuffer = {
-    NULL,
-    0
-};
 
-static Tcl_Obj *namespacePrologue;      /* initial bit of Tcl for namespace creation */
 module MODULE_VAR_EXPORT dtcl_module;
-
-
-int buffer_output = 0;          /* Start with output buffering off */
-int headers_printed = 0; 	/* has the header been printed yet? */
-static int headers_set = 0;     /* has the header been set yet? */
-int content_sent = 0;           /* make sure something gets sent */
 
 //dtcl_interp_globals globals;
 
@@ -148,13 +137,14 @@ static int inputproc(ClientData instancedata, char *buf, int toRead, int *errorC
 
 static int outputproc(ClientData instancedata, char *buf, int toWrite, int *errorCodePtr)
 {
-    memwrite(&obuffer, buf, toWrite);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)instancedata;
+    memwrite(dsc->obuffer, buf, toWrite);
     return toWrite;
 }
 
-static int closeproc(ClientData instancedata, Tcl_Interp *interp2)
+static int closeproc(ClientData instancedata, Tcl_Interp *interp)
 {
-    dtcl_interp_globals *globals = Tcl_GetAssocData(interp2, "dtcl", NULL);
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
     print_headers(globals->r);
     flush_output_buffer(globals->r);
     return 0;
@@ -211,10 +201,11 @@ int memwrite(obuff *buffer, char *input, int len)
 
 int set_header_type(request_rec *r, char *header)
 {
-    if (headers_set == 0)
+    dtcl_server_conf *dsc = dtcl_get_conf(r);
+    if (*(dsc->headers_set) == 0)
     {
 	r->content_type = header;
-	headers_set = 1;
+	*(dsc->headers_set) = 1;
 	return 1;
     } else {
 	return 0;
@@ -225,13 +216,14 @@ int set_header_type(request_rec *r, char *header)
 
 int print_headers(request_rec *r)
 {
-    if (headers_printed == 0)
+    dtcl_server_conf *dsc = dtcl_get_conf(r);
+    if (*(dsc->headers_printed) == 0)
     {
-	if (headers_set == 0)
+	if (*(dsc->headers_set) == 0)
 	    set_header_type(r, DEFAULT_HEADER_TYPE);
 
 	ap_send_http_header(r);
-	headers_printed = 1;
+	*(dsc->headers_printed) = 1;
 	return 1;
     } else {
 	return 0;
@@ -267,14 +259,15 @@ int print_error(request_rec *r, int htmlflag, char *errstr)
 
 int flush_output_buffer(request_rec *r)
 {
-    if (obuffer.len != 0)
+    dtcl_server_conf *dsc = dtcl_get_conf(r);
+    if (dsc->obuffer->len != 0)
     {
-	ap_rwrite(obuffer.buf, obuffer.len, r);
-	Tcl_Free(obuffer.buf);
-	obuffer.len = 0;
-	obuffer.buf = NULL;
+	ap_rwrite(dsc->obuffer->buf, dsc->obuffer->len, r);
+	Tcl_Free(dsc->obuffer->buf);
+	dsc->obuffer->len = 0;
+	dsc->obuffer->buf = NULL;
     }
-    content_sent = 1;
+    *(dsc->content_sent) = 1;
     return 0;
 }
 
@@ -641,14 +634,15 @@ static int send_content(request_rec *r)
     int errstatus;
 
     Tcl_Interp *interp;
+    
+    dtcl_interp_globals *globals = NULL;
+    dtcl_server_conf *dsc = NULL;
 
-    dtcl_server_conf *dsc;
-
-    dtcl_interp_globals globals;
-    globals.r = r;		/* Assign request to global request var */
-
-    interp = GETREQINTERP(r);
     dsc = dtcl_get_conf(r);
+    globals = ap_pcalloc(r->pool, sizeof(dtcl_interp_globals));
+    globals->r = r;
+    interp = GETREQINTERP(r);
+    Tcl_SetAssocData(interp, "dtcl", NULL, globals);
 
     r->allowed |= (1 << M_GET);
     r->allowed |= (1 << M_POST);
@@ -683,7 +677,7 @@ static int send_content(request_rec *r)
     ap_cpystrn(timefmt, DEFAULT_TIME_FORMAT, sizeof(timefmt));
     ap_chdir_file(r->filename);
 
-    if (Tcl_EvalObj(interp, namespacePrologue) == TCL_ERROR)
+    if (Tcl_EvalObj(interp, dsc->namespacePrologue) == TCL_ERROR)
     {
 	ap_log_error(APLOG_MARK, APLOG_ERR, r->server, "Could not create request namespace\n");
 	return HTTP_BAD_REQUEST;
@@ -691,22 +685,20 @@ static int send_content(request_rec *r)
 
     /* Apache Request stuff */
 
-    globals.req = ApacheRequest_new(r);
-    globals.r = r;
-    Tcl_SetAssocData(interp, "dtcl", NULL, &globals); /* we use this instead of global_rr */
+    globals->req = ApacheRequest_new(r);
 
-    ApacheRequest_set_post_max(globals.req, dsc->upload_max);
-    ApacheRequest_set_temp_dir(globals.req, dsc->upload_dir);
+    ApacheRequest_set_post_max(globals->req, dsc->upload_max);
+    ApacheRequest_set_temp_dir(globals->req, dsc->upload_dir);
 
 #if 0
     if (upload_files_to_var)
     {
-	globals.req->hook_data = interp;
-	globals.req->upload_hook = dtcl_upload_hook;
+	globals->req->hook_data = interp;
+	globals->req->upload_hook = dtcl_upload_hook;
     }
 #endif
 
-    ApacheRequest___parse(globals.req);
+    ApacheRequest___parse(globals->req);
 
     /* take results and create tcl variables from them */
 #if USE_ONLY_VAR_COMMAND == 1
@@ -798,10 +790,10 @@ static int send_content(request_rec *r)
 
     get_parse_exec_file(r, dsc, 1);
     /* reset globals  */
-    buffer_output = 0;
-    headers_printed = 0;
-    headers_set = 0;
-    content_sent = 0;
+    *(dsc->buffer_output) = 0;
+    *(dsc->headers_printed) = 0;
+    *(dsc->headers_set) = 0;
+    *(dsc->content_sent) = 0;
 
     return OK;
 }
@@ -809,20 +801,21 @@ static int send_content(request_rec *r)
 /* This is done in two places, so I decided to group the creates in
    one function */
 
-static void tcl_create_commands(Tcl_Interp *interp)
+static void tcl_create_commands(dtcl_server_conf *dsc)
 {
-    Tcl_CreateObjCommand(interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "buffered", Buffered, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "headers", Headers, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "hgetvars", HGetVars, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "var", Var, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "upload", Upload, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "include", Include, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "parse", Parse, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "hflush", HFlush, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "dtcl_info", Dtcl_Info, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-    Tcl_CreateObjCommand(interp, "no_body", No_Body, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_Interp *interp = dsc->server_interp;
+    Tcl_CreateObjCommand(interp, "hputs", Hputs, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "buffer_add", Buffer_Add, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "buffered", Buffered, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "headers", Headers, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "hgetvars", HGetVars, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "var", Var, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "upload", Upload, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "include", Include, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "parse", Parse, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "hflush", HFlush, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "dtcl_info", Dtcl_Info, NULL, (Tcl_CmdDeleteProc *)NULL);
+    Tcl_CreateObjCommand(interp, "no_body", No_Body, NULL, (Tcl_CmdDeleteProc *)NULL);
 }
 
 static void tcl_init_stuff(server_rec *s, pool *p)
@@ -838,7 +831,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     dsc->server_interp = interp; /* root interpreter */
 
     /* Create TCL commands to deal with Apache's BUFFs. */
-    achan = Tcl_CreateChannel(&Achan, "apacheout", NULL, TCL_WRITABLE);
+    achan = Tcl_CreateChannel(&Achan, "apacheout", dsc, TCL_WRITABLE);
 
     system_encoding = Tcl_GetEncoding(NULL, "iso8859-1"); /* FIXME */
 
@@ -860,12 +853,12 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	ap_log_error(APLOG_MARK, APLOG_ERR, s, Tcl_GetStringResult(interp));
 	exit(1);
     }
-    tcl_create_commands(interp);
-    namespacePrologue = Tcl_NewStringObj(
+    tcl_create_commands(dsc);
+    dsc->namespacePrologue = Tcl_NewStringObj(
 	"catch { namespace delete request }\n"
 	"namespace eval request { }\n"
 	"proc ::request::global { args } { foreach arg $args { uplevel \"::global ::request::$arg\" } }\n", -1);
-    Tcl_IncrRefCount(namespacePrologue);
+    Tcl_IncrRefCount(dsc->namespacePrologue);
 
 #if DBG
     ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"", Tcl_GetStringFromObj(dsc->dtcl_global_init_script, NULL));  /* XXX */
@@ -906,7 +899,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	if (!mydsc->server_interp)
 	{
 	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
-	    tcl_create_commands(mydsc->server_interp);
+	    tcl_create_commands(mydsc);
 	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
 	    Tcl_RegisterChannel(mydsc->server_interp, achan);
 	}
@@ -997,9 +990,6 @@ const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
 }
 
 /* function to get a config, and merge the directory/server options  */
-
-/* NOTE that this returns values which cannot be modified, as they are
-   just copies of the original! */
 dtcl_server_conf *dtcl_get_conf(request_rec *r)
 {
     dtcl_server_conf *newconfig = NULL;
@@ -1013,6 +1003,7 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
     {
 	newconfig = (dtcl_server_conf *) ap_pcalloc(r->pool, sizeof(dtcl_server_conf));
 	ddc = (dtcl_server_conf *) ap_get_module_config(dconf, &dtcl_module);
+	newconfig->server_interp = dsc->server_interp;
 	newconfig->dtcl_before_script = ddc->dtcl_before_script ? ddc->dtcl_before_script : dsc->dtcl_before_script;
 	newconfig->dtcl_after_script = ddc->dtcl_after_script ? ddc->dtcl_after_script : dsc->dtcl_after_script;
 	newconfig->dtcl_error_script = ddc->dtcl_error_script ? ddc->dtcl_error_script : dsc->dtcl_error_script;
@@ -1020,6 +1011,14 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
 	newconfig->cache_free = dsc->cache_free;
 	newconfig->objCacheList = dsc->objCacheList;
 	newconfig->objCache = dsc->objCache;
+	newconfig->namespacePrologue = dsc->namespacePrologue;
+	
+	newconfig->buffer_output = dsc->buffer_output;
+	newconfig->headers_printed = dsc->headers_printed;
+	newconfig->headers_set = dsc->headers_set;
+	newconfig->content_sent = dsc->content_sent;
+	newconfig->obuffer = dsc->obuffer;
+
 	return newconfig;
     }
     return dsc;
@@ -1046,6 +1045,17 @@ static void *create_dtcl_config(pool *p, server_rec *s)
     dsc->upload_dir = "/tmp";
     dsc->objCacheList = NULL;
     dsc->objCache = ap_pcalloc(p, sizeof(Tcl_HashTable));
+    dsc->namespacePrologue = NULL;
+
+    dsc->buffer_output = ap_pcalloc(p, sizeof(int));
+    dsc->headers_printed = ap_pcalloc(p, sizeof(int));
+    dsc->headers_set = ap_pcalloc(p, sizeof(int));
+    dsc->content_sent = ap_pcalloc(p, sizeof(int));
+    *(dsc->buffer_output) = 0;
+    *(dsc->headers_printed) = 0;
+    *(dsc->headers_set) = 0;
+    *(dsc->content_sent) = 0;
+    dsc->obuffer = ap_pcalloc(p, sizeof(obuff));
     return dsc;
 }
 
@@ -1081,7 +1091,7 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 /*     dsc->cache_size = overrides->cache_size ? overrides->cache_size : base->cache_size;
     dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;  */
     dsc->upload_max = overrides->upload_max ? overrides->upload_max : base->upload_max;
-    dsc->upload_files_to_var = overrides->upload_files_to_var ? overrides->upload_files_to_var : base->upload_files_to_var;
+/*     dsc->upload_files_to_var = overrides->upload_files_to_var ? overrides->upload_files_to_var : base->upload_files_to_var;  */
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name;
     dsc->upload_dir = overrides->upload_dir ? overrides->upload_dir : base->upload_dir;
 

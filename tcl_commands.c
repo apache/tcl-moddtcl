@@ -20,10 +20,6 @@
 
 extern module dtcl_module;
 
-extern obuff obuffer;
-extern int content_sent;
-extern int buffer_output;
-extern int headers_printed;
 extern Tcl_Obj *uploadstorage[];
 
 #define POOL (globals->r->pool)
@@ -34,9 +30,8 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 {
     char *filename;
     struct stat finfo;
-
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = dtcl_get_conf(globals->r);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc != 2)
     {
@@ -69,6 +64,8 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     Tcl_Channel fd;
     int sz;
     char buf[BUFSZ];
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc != 2)
     {
@@ -99,7 +96,7 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
         /* we could include code to either ap_pwrite this or memwrite
            it, depending on buffering */
-	memwrite(&obuffer, buf, sz);
+	memwrite(dsc->obuffer, buf, sz);
 
 	if (sz < BUFSZ - 1)
 	    break;
@@ -116,6 +113,9 @@ int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CON
 {
     char *arg1;
     int len;
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+  
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "string");
@@ -123,8 +123,8 @@ int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CON
     }
     arg1 = Tcl_GetByteArrayFromObj(objv[1], &len);
 
-    memwrite(&obuffer, arg1, len);
-    content_sent = 0;
+    memwrite(dsc->obuffer, arg1, len);
+    *(dsc->content_sent) = 0;
     return TCL_OK;
 }
 
@@ -134,8 +134,8 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 {
     char *arg1;
     int length;
-
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module); 
 
     if (objc < 2)
     {
@@ -161,9 +161,9 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	    Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
 	    return TCL_ERROR;
 	}
-	if (buffer_output == 1)
+	if (*(dsc->buffer_output) == 1)
 	{
-	    memwrite(&obuffer, arg1, length);
+	    memwrite(dsc->obuffer, arg1, length);
 	} else {
 	    print_headers(globals->r);
 	    flush_output_buffer(globals->r);
@@ -179,14 +179,15 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
     char *opt;
-
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "option arg ?arg ...?");
 	return TCL_ERROR;
     }
-    if (headers_printed != 0)
+    if (*(dsc->headers_printed) != 0)
     {
 	Tcl_AddObjErrorInfo(interp, "Cannot manipulate headers - already sent", -1);
 	return TCL_ERROR;
@@ -278,8 +279,8 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
     char *opt = NULL; 
-
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module); 
 
     if (objc != 2)
     {
@@ -289,9 +290,9 @@ int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     opt = Tcl_GetStringFromObj(objv[1], NULL);
     if (!strncmp(opt, "on", 2))
     {
-	buffer_output = 1;
+	*(dsc->buffer_output) = 1;
     } else if (!strncmp(opt, "off", 3)) {
-	buffer_output = 0;
+	*(dsc->buffer_output) = 0;
 	print_headers(globals->r);
 	flush_output_buffer(globals->r);
     } else {
@@ -334,15 +335,13 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 
     int i;
 
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
     array_header *hdrs_arr;
     table_entry *hdrs;
     array_header *env_arr;
     table_entry  *env;
-
-    dtcl_interp_globals *globals = NULL;
     Tcl_Obj *EnvsObj = NULL;
-
-    globals = Tcl_GetAssocData(interp, "dtcl", NULL);
 
     EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
     Tcl_IncrRefCount(EnvsObj);
@@ -653,9 +652,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
     Tcl_Obj *result = NULL;
     ApacheUpload *upload;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = NULL;
-
-    dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2 || objc > 5)
     {
@@ -828,7 +825,7 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 		       "</td></tr></table>\n", *(dsc->cache_free), getpid());
 /*     print_headers(globals->r);
     flush_output_buffer(globals->r);  */
-    memwrite(&obuffer, tble, strlen(tble));
+    memwrite(dsc->obuffer, tble, strlen(tble));
     return TCL_OK;
 }
 
@@ -837,13 +834,16 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 
 int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
+    
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    if (content_sent == 1)
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+
+    if (*(dsc->content_sent) == 1)
 	return TCL_ERROR;
 
     print_headers(globals->r);
-    Tcl_Free(obuffer.buf);
-    obuffer.buf = NULL;
-    obuffer.len = 0;
+    Tcl_Free(dsc->obuffer->buf);
+    dsc->obuffer->buf = NULL;
+    dsc->obuffer->len = 0;
     return TCL_OK;
 }

@@ -54,6 +54,11 @@
 /* #define DTCL_VERSION "X.X.X" */
 
 typedef struct {
+    char *buf;
+    int len;
+} obuff;
+
+typedef struct {
     Tcl_Interp *server_interp;          /* per server Tcl interpreter */
     Tcl_Obj *dtcl_global_init_script;   /* run once when apache is first started */
     Tcl_Obj *dtcl_child_init_script;
@@ -68,22 +73,26 @@ typedef struct {
     char *server_name;
     char *upload_dir;
 
-    char **objCacheList;    /* Array of cached objects (for priority handling) */
+    char **objCacheList;     /* Array of cached objects (for priority handling) */
     Tcl_HashTable *objCache; /* Objects cache - the key is the script name */
+
+    Tcl_Obj *namespacePrologue; /* initial bit of Tcl for namespace creation */
+
+    /* stuff for buffering output */
+    int *buffer_output;     /* Start with output buffering off */
+    int *headers_printed; 	/* has the header been printed yet? */
+    int *headers_set;       /* has the header been set yet? */
+    int *content_sent;      /* make sure something gets sent */
+    obuff *obuffer;
 } dtcl_server_conf;
 
 /* eventually we will transfer 'global' variables in here and
    'de-globalize' them */
 
 typedef struct {
-    request_rec *r;         /* request rec */
-    ApacheRequest *req;     /* libapreq request  */
+    request_rec *r;             /* request rec */
+    ApacheRequest *req;         /* libapreq request  */
 } dtcl_interp_globals;
-
-typedef struct {
-    char *buf;
-    int len;
-} obuff;
 
 int memwrite(obuff *, char *, int);
 int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel);
