@@ -1,6 +1,9 @@
 #ifndef MOD_DTCL_H
 #define MOD_DTCL_H 1
 
+#include <tcl.h>
+#include "apache_request.h"
+
 /* Error wrappers  */
 #define ER1 "<hr><p><code><pre>\n"
 #define ER2 "</pre></code><hr>\n"
@@ -49,11 +52,6 @@
 /* #define DTCL_VERSION "X.X.X" */
 
 typedef struct {
-    char *buf;
-    int len;
-} obuff;
-
-typedef struct {
     Tcl_Interp *server_interp;          /* per server Tcl interpreter */
     Tcl_Obj *dtcl_global_init_script;   /* run once when apache is first started */
     Tcl_Obj *dtcl_child_init_script;
@@ -79,7 +77,8 @@ typedef struct {
     int *headers_printed; 	/* has the header been printed yet? */
     int *headers_set;       /* has the header been set yet? */
     int *content_sent;      /* make sure something gets sent */
-    obuff *obuffer;
+    Tcl_DString *buffer;
+    Tcl_Channel *outchannel;
 } dtcl_server_conf;
 
 /* eventually we will transfer 'global' variables in here and
@@ -90,7 +89,6 @@ typedef struct {
     ApacheRequest *req;         /* libapreq request  */
 } dtcl_interp_globals;
 
-int memwrite(obuff *, char *, int);
 int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel);
 int set_header_type(request_rec *, char *);
 int print_headers(request_rec *);

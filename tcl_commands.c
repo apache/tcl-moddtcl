@@ -31,7 +31,8 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     char *filename;
     struct stat finfo;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc != 2)
     {
@@ -65,7 +66,10 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     int sz;
     char buf[BUFSZ];
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc =
+	(dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config,
+						 &dtcl_module);
+    Tcl_Obj *outobj;
 
     if (objc != 2)
     {
@@ -74,7 +78,7 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     }
 
     fd = Tcl_OpenFileChannel(interp,
-			     Tcl_GetStringFromObj (objv[1], (int *)NULL), "r", 0664);
+			     Tcl_GetStringFromObj(objv[1], (int *)NULL), "r", 0664);
 
     if (fd == NULL)
     {
@@ -85,13 +89,14 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 /*     print_headers(globals->r);
        flush_output_buffer(globals->r);  */
 
-    /* Use Tcl_Read because we don't want to fool with UTF - just read
-       it in and dump it out. */
-    while ((sz = Tcl_Read(fd, buf, BUFSZ - 1)))
+    outobj = Tcl_NewObj();
+    Tcl_IncrRefCount(outobj);
+    while ((sz = Tcl_ReadChars(fd, outobj, BUFSZ - 1, 0)))
     {
 	if (sz == -1)
 	{
 	    Tcl_AddErrorInfo(interp, Tcl_PosixError(interp));
+	    Tcl_DecrRefCount(outobj);
 	    return TCL_ERROR;
 	}
 
@@ -99,38 +104,30 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
         /* we could include code to either ap_pwrite this or memwrite
            it, depending on buffering */
-	memwrite(dsc->obuffer, buf, sz);
+	Tcl_WriteObj(*(dsc->outchannel), outobj);
 
 	if (sz < BUFSZ - 1)
 	    break;
     }
-    return Tcl_Close(interp,fd);
-
-/*     close(fd);  */
-    return TCL_OK;
+    Tcl_DecrRefCount(outobj);
+    return Tcl_Close(interp, fd);
 }
 
 /* Command to *only* add to the output buffer */
 
 int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-    char *arg1;
-    int len;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
-    Tcl_DString outstring;
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "string");
 	return TCL_ERROR;
     }
-    arg1 = Tcl_GetByteArrayFromObj(objv[1], &len);
-
-    Tcl_UtfToExternalDString(NULL, arg1, len, &outstring);
-    memwrite(dsc->obuffer, Tcl_DStringValue(&outstring), Tcl_DStringLength(&outstring));
+    Tcl_WriteObj(*(dsc->outchannel), objv[1]);
     *(dsc->content_sent) = 0;
-    Tcl_DStringFree(&outstring);
     return TCL_OK;
 }
 
@@ -141,7 +138,8 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     char *arg1;
     int length;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2)
     {
@@ -149,7 +147,7 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	return TCL_ERROR;
     }
 
-    arg1 = Tcl_GetByteArrayFromObj(objv[1], &length);
+    arg1 = Tcl_GetStringFromObj(objv[1], &length);
 
     if (!strncmp("-error", arg1, 6))
     {
@@ -170,11 +168,11 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	}
 	/* transform it from UTF to External representation */
 	Tcl_UtfToExternalDString(NULL, arg1, length, &outstring);
-	arg1 = Tcl_DStringValue(&outstring);
+ 	arg1 = Tcl_DStringValue(&outstring);
 	length = Tcl_DStringLength(&outstring);
 	if (*(dsc->buffer_output) == 1)
 	{
-	    memwrite(dsc->obuffer, arg1, length);
+	    Tcl_DStringAppend(dsc->buffer, arg1, length);
 	} else {
 	    print_headers(globals->r);
 	    flush_output_buffer(globals->r);
@@ -192,7 +190,8 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 {
     char *opt;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2)
     {
@@ -243,7 +242,8 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	    Tcl_WrongNumArgs(interp, 2, objv, "new-url");
 	    return TCL_ERROR;
 	}
-	ap_table_set(globals->r->headers_out, "Location", Tcl_GetStringFromObj (objv[2], (int *)NULL));
+	ap_table_set(globals->r->headers_out, "Location",
+		     Tcl_GetStringFromObj (objv[2], (int *)NULL));
 	globals->r->status = 301;
 	return TCL_RETURN;
     }
@@ -292,7 +292,8 @@ int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 {
     char *opt = NULL;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc != 2)
     {
@@ -393,31 +394,42 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     }
 
     /* These were the "include vars"  */
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 0), POOL), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_GMT", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 1), POOL), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("LAST_MODIFIED", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, globals->r->finfo.st_mtime, timefmt, 0), POOL), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_URI", -1), STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_PATH_INFO", -1), STRING_TO_UTF_TO_OBJ(globals->r->path_info, POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1),
+		   STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 0), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_GMT", -1),
+		   STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 1), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("LAST_MODIFIED", -1),
+		   STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, globals->r->finfo.st_mtime, timefmt, 0), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_URI", -1),
+		   STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_PATH_INFO", -1),
+		   STRING_TO_UTF_TO_OBJ(globals->r->path_info, POOL), 0);
 
 #ifndef WIN32
     pw = getpwuid(globals->r->finfo.st_uid);
     if (pw)
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1), STRING_TO_UTF_TO_OBJ(ap_pstrdup(POOL, pw->pw_name), POOL), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1),
+		       STRING_TO_UTF_TO_OBJ(ap_pstrdup(POOL, pw->pw_name), POOL), 0);
     else
 	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1),
-		       STRING_TO_UTF_TO_OBJ(ap_psprintf(POOL, "user#%lu", (unsigned long) globals->r->finfo.st_uid), POOL), 0);
+		       STRING_TO_UTF_TO_OBJ(
+			   ap_psprintf(POOL, "user#%lu",
+				       (unsigned long) globals->r->finfo.st_uid), POOL), 0);
 #endif
 
     if ((t = strrchr(globals->r->filename, '/')))
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(++t, POOL), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1),
+		       STRING_TO_UTF_TO_OBJ(++t, POOL), 0);
     else
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1),
+		       STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
 
     if (globals->r->args)
     {
 	char *arg_copy = ap_pstrdup(POOL, globals->r->args);
 	ap_unescape_url(arg_copy);
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("QUERY_STRING_UNESCAPED", -1), STRING_TO_UTF_TO_OBJ(ap_escape_shell_cmd(POOL, arg_copy), POOL), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("QUERY_STRING_UNESCAPED", -1),
+		       STRING_TO_UTF_TO_OBJ(ap_escape_shell_cmd(POOL, arg_copy), POOL), 0);
     }
 
     /* ----------------------------  */
@@ -428,7 +440,8 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	if (!hdrs[i].key)
 	    continue;
 	else {
-	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key, POOL), STRING_TO_UTF_TO_OBJ(hdrs[i].val, POOL), 0);
+	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key, POOL),
+			   STRING_TO_UTF_TO_OBJ(hdrs[i].val, POOL), 0);
 	}
     }
 
@@ -437,7 +450,8 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     {
 	if (!env[i].key)
 	    continue;
-	Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(env[i].key, POOL), STRING_TO_UTF_TO_OBJ(env[i].val, POOL), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(env[i].key, POOL),
+		       STRING_TO_UTF_TO_OBJ(env[i].val, POOL), 0);
     }
 
     do { /* I do this because I want some 'local' variables */
@@ -487,7 +501,8 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 
     if (objc < 2 || objc > 3)
     {
-	Tcl_WrongNumArgs(interp, 1, objv, "(get varname|list varname|exists varname|names|number|all)");
+	Tcl_WrongNumArgs(interp, 1, objv,
+			 "(get varname|list varname|exists varname|names|number|all)");
 	return TCL_ERROR;
     }
     command = Tcl_GetString(objv[1]);
@@ -666,7 +681,8 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
     Tcl_Obj *result = NULL;
     ApacheUpload *upload;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2 || objc > 5)
     {
@@ -838,8 +854,8 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 		       "</table>\n"
 		       "</td></tr></table>\n", *(dsc->cache_free), getpid());
 /*     print_headers(globals->r);
-    flush_output_buffer(globals->r);  */
-    memwrite(dsc->obuffer, tble, strlen(tble));
+       flush_output_buffer(globals->r);  */
+    Tcl_WriteObj(*(dsc->outchannel), Tcl_NewStringObj(tble, -1));
     return TCL_OK;
 }
 
@@ -850,14 +866,13 @@ int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 {
 
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (*(dsc->content_sent) == 1)
 	return TCL_ERROR;
 
     print_headers(globals->r);
-    Tcl_Free(dsc->obuffer->buf);
-    dsc->obuffer->buf = NULL;
-    dsc->obuffer->len = 0;
+    Tcl_DStringInit(dsc->buffer);
     return TCL_OK;
 }

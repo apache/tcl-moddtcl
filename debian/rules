@@ -32,8 +32,6 @@ binary-arch: checkroot build
 	cd debian/tmp && install -d `cat ../dirs`
 	cp mod_dtcl.so debian/tmp/usr/lib/apache/1.3/
 	cp debian/400mod_dtcl.info debian/tmp/usr/lib/apache/1.3/
-# Must have debmake installed for this to work. Otherwise please copy
-# /usr/bin/debstd into the debian directory and change debstd to debian/debstd
 	dh_installdocs docs/ contrib/
 	dh_installchangelogs
 	dh_installmanpages

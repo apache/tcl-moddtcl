@@ -77,127 +77,21 @@
 
 #include "tcl_commands.h"
 #include "parser.h"
+#include "channel.h"
 #include "apache_request.h"
 #include "mod_dtcl.h"
-
-/* *** Global variables *** */
-Tcl_Encoding system_encoding;    /* Default encoding  */
 
 module MODULE_VAR_EXPORT dtcl_module;
 
 static void tcl_init_stuff(server_rec *s, pool *p);
 static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf *newdsc);
-static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf);
+static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc,
+			 Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf);
 static int send_content(request_rec *);
 static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
 
 /* just need some arbitrary non-NULL pointer which can't also be a request_rec */
 #define NESTED_INCLUDE_MAGIC	(&dtcl_module)
-
-/* Functions for Tcl Channel */
-
-static int closeproc(ClientData, Tcl_Interp *);
-static int inputproc(ClientData, char *, int, int *);
-static int outputproc(ClientData, char *, int, int *);
-static int setoptionproc(ClientData, Tcl_Interp *, char *, char *);
-/*
-  static int getoptionproc(ClientData, Tcl_Interp *, char *, Tcl_DString *); */
-static void watchproc(ClientData, int);
-static int gethandleproc(ClientData, int, ClientData *);
-
-/* Apache BUFF Channel Type */
-static Tcl_ChannelType Achan = {
-    "apache_channel",
-    NULL,
-    closeproc,
-    inputproc,
-    outputproc,
-    NULL,
-    setoptionproc,
-    NULL,
-    watchproc,
-    gethandleproc,
-    NULL
-};
-
-static int inputproc(ClientData instancedata, char *buf, int toRead, int *errorCodePtr)
-{
-    return EINVAL;
-}
-
-/* This is the output 'method' for the Memory Buffer Tcl 'File'
-   Channel that we create to divert stdout to */
-
-static int outputproc(ClientData instancedata, char *buf, int toWrite, int *errorCodePtr)
-{
-    Tcl_DString outstring;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)instancedata;
-    /* we will have to deal with this when we switch over to using the
-       channel directly */
-    Tcl_UtfToExternalDString(NULL, buf, toWrite, &outstring);
-    memwrite(dsc->obuffer, Tcl_DStringValue(&outstring),
-	     Tcl_DStringLength(&outstring));
-    Tcl_DStringFree(&outstring);
-    return toWrite;
-}
-
-static int closeproc(ClientData instancedata, Tcl_Interp *interp)
-{
-    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    print_headers(globals->r);
-    flush_output_buffer(globals->r);
-    return 0;
-}
-
-static int setoptionproc(ClientData instancedata, Tcl_Interp *interp, char *optionname, char *value)
-{
-    return TCL_OK;
-}
-
-/*
-int getoptionproc(ClientData instancedata, Tcl_Interp *intepr,
-				      char *optionname, Tcl_DString *dsPtr)
-{
-    return TCL_OK;
-}
-*/
-
-static void watchproc(ClientData instancedata, int mask)
-{
-    /* not much to do here */
-    return;
-}
-
-static int gethandleproc(ClientData instancedata, int direction, ClientData *handlePtr)
-{
-    return TCL_ERROR;
-}
-
-/* Write something to the output buffer structure */
-
-/* In the future, we ought to replace calls to this with
-   Tcl_WriteChars or something else that uses the channel directly. */
-
-int memwrite(obuff *buffer, char *input, int len)
-{
-    if (buffer->len == 0)
-    {
-	buffer->buf = Tcl_Alloc(len + 1);
-	memcpy(buffer->buf, input, len);
-	buffer->buf[len] = '\0';
-	buffer->len = len;
-    }
-    else
-    {
-	char *bufend;
-	buffer->buf = Tcl_Realloc(buffer->buf, len + buffer->len + 1);
-	bufend = buffer->buf + buffer->len;
-	memmove(bufend, input, len);
-	buffer->buf[len + buffer->len] = '\0';
-	buffer->len += len;
-    }
-    return len;
-}
 
 /* Set up the content type header */
 
@@ -262,12 +156,10 @@ int print_error(request_rec *r, int htmlflag, char *errstr)
 int flush_output_buffer(request_rec *r)
 {
     dtcl_server_conf *dsc = dtcl_get_conf(r);
-    if (dsc->obuffer->len != 0)
+    if (Tcl_DStringLength(dsc->buffer) != 0)
     {
-	ap_rwrite(dsc->obuffer->buf, dsc->obuffer->len, r);
-	Tcl_Free(dsc->obuffer->buf);
-	dsc->obuffer->len = 0;
-	dsc->obuffer->buf = NULL;
+	ap_rwrite(Tcl_DStringValue(dsc->buffer), Tcl_DStringLength(dsc->buffer), r);
+	Tcl_DStringInit(dsc->buffer);
     }
     *(dsc->content_sent) = 1;
     return 0;
@@ -280,7 +172,7 @@ char *StringToUtf(char *input, ap_pool *pool)
     char *temp;
     Tcl_DString dstr;
     Tcl_DStringInit(&dstr);
-    Tcl_ExternalToUtfDString(system_encoding, input, strlen(input), &dstr);
+    Tcl_ExternalToUtfDString(NULL, input, strlen(input), &dstr);
 
     temp = ap_pstrdup(pool, Tcl_DStringValue(&dstr));
     Tcl_DStringFree(&dstr);
@@ -354,7 +246,8 @@ static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_
 
 /* Parse and execute a ttml file */
 
-static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf)
+static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *interp,
+			 char *filename, int toplevel, Tcl_Obj *outbuf)
 {
     /* BEGIN PARSER  */
     int inside = 0;	/* are we inside the starting/ending delimiters  */
@@ -467,7 +360,8 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
        create it. */
     if (*(dsc->cache_size))
     {
-	hashKey = ap_psprintf(r->pool, "%s%lx%lx%d", r->filename, r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
+	hashKey = ap_psprintf(r->pool, "%s%lx%lx%d", r->filename,
+			      r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
 	entry = Tcl_CreateHashEntry(dsc->objCache, hashKey, &isNew);
     }
     if (isNew || *(dsc->cache_size) == 0)
@@ -493,11 +387,13 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
 	    dsc->objCacheList[-- *(dsc->cache_free) ] = strdup(hashKey);
 	} else if (*(dsc->cache_size)) { /* if it's zero, we just skip this... */
 	    Tcl_HashEntry *delEntry;
-	    delEntry = Tcl_FindHashEntry(dsc->objCache, dsc->objCacheList[*(dsc->cache_size) - 1]);
+	    delEntry = Tcl_FindHashEntry(dsc->objCache,
+					 dsc->objCacheList[*(dsc->cache_size) - 1]);
 	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
 	    Tcl_DeleteHashEntry(delEntry);
 	    free(dsc->objCacheList[*(dsc->cache_size) - 1]);
-	    memmove((dsc->objCacheList) + 1, dsc->objCacheList, sizeof(char *) * (*(dsc->cache_size) -1));
+	    memmove((dsc->objCacheList) + 1, dsc->objCacheList,
+		    sizeof(char *) * (*(dsc->cache_size) -1));
 	    dsc->objCacheList[0] = strdup(hashKey);
 	}
     } else {
@@ -703,24 +599,23 @@ static void tcl_create_commands(dtcl_server_conf *dsc)
 static void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
-    Tcl_Channel achan;
     Tcl_Interp *interp;
-    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     server_rec *sr;
     /* Initialize TCL stuff  */
 
+    Tcl_FindExecutable(NULL);
     interp = Tcl_CreateInterp();
     dsc->server_interp = interp; /* root interpreter */
 
     /* Create TCL commands to deal with Apache's BUFFs. */
-    achan = Tcl_CreateChannel(&Achan, "apacheout", dsc, TCL_WRITABLE);
+    *(dsc->outchannel) = Tcl_CreateChannel(&ApacheChan, "apacheout", dsc, TCL_WRITABLE);
 
-    system_encoding = Tcl_GetEncoding(NULL, "iso8859-1"); /* FIXME */
+    Tcl_SetStdChannel(*(dsc->outchannel), TCL_STDOUT);
+    Tcl_SetChannelOption(interp, *(dsc->outchannel), "-buffering", "none");
 
-    Tcl_SetStdChannel(achan, TCL_STDOUT);
-    Tcl_SetChannelOption(interp, achan, "-buffering", "none");
-
-    Tcl_RegisterChannel(interp, achan);
+    Tcl_RegisterChannel(interp, *(dsc->outchannel));
     if (interp == NULL)
     {
 	ap_log_error(APLOG_MARK, APLOG_ERR, s, "Error in Tcl_CreateInterp, aborting\n");
@@ -743,7 +638,8 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     Tcl_IncrRefCount(dsc->namespacePrologue);
 
 #if DBG
-    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"", Tcl_GetStringFromObj(dsc->dtcl_global_init_script, NULL));  /* XXX */
+    ap_log_error(APLOG_MARK, APLOG_ERR, s, "Config string = \"%s\"",
+		 Tcl_GetStringFromObj(dsc->dtcl_global_init_script, NULL));  /* XXX */
     ap_log_error(APLOG_MARK, APLOG_ERR, s, "Cache size = \"%d\"", *(dsc->cache_size));  /* XXX */
 #endif
 
@@ -792,8 +688,8 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	{
 	    mydsc->server_interp = Tcl_CreateSlave(interp, sr->server_hostname, 0);
 	    tcl_create_commands(mydsc);
-	    Tcl_SetChannelOption(mydsc->server_interp, achan, "-buffering", "none");
-	    Tcl_RegisterChannel(mydsc->server_interp, achan);
+	    Tcl_SetChannelOption(mydsc->server_interp, *(dsc->outchannel), "-buffering", "none");
+	    Tcl_RegisterChannel(mydsc->server_interp, *(dsc->outchannel));
 	}
 
 	mydsc->server_name = ap_pstrdup(p, sr->server_hostname);
@@ -857,7 +753,8 @@ static const char *set_script(cmd_parms *cmd, dtcl_server_conf *ddc, char *arg, 
 static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     *(dsc->cache_size) = strtol(arg, NULL, 10);
     return NULL;
 }
@@ -865,7 +762,8 @@ static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 static const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     dsc->upload_dir = arg;
     return NULL;
 }
@@ -873,7 +771,8 @@ static const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
 static const char *set_uploadmax(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     dsc->upload_max = strtol(arg, NULL, 10);
     return NULL;
 }
@@ -881,7 +780,8 @@ static const char *set_uploadmax(cmd_parms *cmd, void *dummy, char *arg)
 static const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     if (!strcmp(arg, "on"))
 	dsc->upload_files_to_var = 1;
     else
@@ -892,7 +792,8 @@ static const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
 static const char *set_seperatevirtinterps(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
     if (!strcmp(arg, "on"))
 	dsc->seperate_virtual_interps = 1;
     else
@@ -917,9 +818,12 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
 	newconfig->server_interp = dsc->server_interp;
 	copy_dtcl_config(r->pool, dsc, newconfig);
 	/* list here things that can be per-directory  */
-	newconfig->dtcl_before_script = ddc->dtcl_before_script ? ddc->dtcl_before_script : dsc->dtcl_before_script;
-	newconfig->dtcl_after_script = ddc->dtcl_after_script ? ddc->dtcl_after_script : dsc->dtcl_after_script;
-	newconfig->dtcl_error_script = ddc->dtcl_error_script ? ddc->dtcl_error_script : dsc->dtcl_error_script;
+	newconfig->dtcl_before_script = ddc->dtcl_before_script ?
+	    ddc->dtcl_before_script : dsc->dtcl_before_script;
+	newconfig->dtcl_after_script = ddc->dtcl_after_script ?
+	    ddc->dtcl_after_script : dsc->dtcl_after_script;
+	newconfig->dtcl_error_script = ddc->dtcl_error_script ?
+	    ddc->dtcl_error_script : dsc->dtcl_error_script;
 	return newconfig;
     }
     return dsc; /* if there is no per dir config, just return the
@@ -954,7 +858,8 @@ static void copy_dtcl_config(pool *p, dtcl_server_conf *olddsc, dtcl_server_conf
     newdsc->headers_printed = olddsc->headers_printed;
     newdsc->headers_set = olddsc->headers_set;
     newdsc->content_sent = olddsc->content_sent;
-    newdsc->obuffer = olddsc->obuffer;
+    newdsc->buffer = olddsc->buffer;
+    newdsc->outchannel = olddsc->outchannel;
 }
 
 static void *create_dtcl_config(pool *p, server_rec *s)
@@ -991,7 +896,9 @@ static void *create_dtcl_config(pool *p, server_rec *s)
     *(dsc->headers_printed) = 0;
     *(dsc->headers_set) = 0;
     *(dsc->content_sent) = 0;
-    dsc->obuffer = ap_pcalloc(p, sizeof(obuff));
+    dsc->buffer = ap_pcalloc(p, sizeof(Tcl_DString));
+    Tcl_DStringInit(dsc->buffer);
+    dsc->outchannel = ap_pcalloc(p, sizeof(Tcl_Channel));
     return dsc;
 }
 
@@ -1007,29 +914,41 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dtcl_server_conf *base = (dtcl_server_conf *) basev;
     dtcl_server_conf *overrides = (dtcl_server_conf *) overridesv;
 
-    dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
+    dsc->server_interp = overrides->server_interp ?
+	overrides->server_interp : base->server_interp;
 
 #if 0 /* this stuff should only be done once at the top level  */
-    dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ? overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
+    dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ?
+	overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
 
-    dsc->dtcl_child_init_script = overrides->dtcl_child_init_script ? overrides->dtcl_child_init_script : base->dtcl_child_init_script;
+    dsc->dtcl_child_init_script = overrides->dtcl_child_init_script ?
+	overrides->dtcl_child_init_script : base->dtcl_child_init_script;
 
-    dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ? overrides->dtcl_child_exit_script : base->dtcl_child_exit_script;
+    dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ?
+	overrides->dtcl_child_exit_script : base->dtcl_child_exit_script;
 
 #endif
 
-    dsc->dtcl_before_script = overrides->dtcl_before_script ? overrides->dtcl_before_script : base->dtcl_before_script;
+    dsc->dtcl_before_script = overrides->dtcl_before_script ?
+	overrides->dtcl_before_script : base->dtcl_before_script;
 
-    dsc->dtcl_after_script = overrides->dtcl_after_script ? overrides->dtcl_after_script : base->dtcl_after_script;
+    dsc->dtcl_after_script = overrides->dtcl_after_script ?
+	overrides->dtcl_after_script : base->dtcl_after_script;
 
-    dsc->dtcl_error_script = overrides->dtcl_error_script ? overrides->dtcl_error_script : base->dtcl_error_script;
+    dsc->dtcl_error_script = overrides->dtcl_error_script ?
+	overrides->dtcl_error_script : base->dtcl_error_script;
 
-/*     dsc->cache_size = overrides->cache_size ? overrides->cache_size : base->cache_size;
-    dsc->cache_free = overrides->cache_free ? overrides->cache_free : base->cache_free;  */
-    dsc->upload_max = overrides->upload_max ? overrides->upload_max : base->upload_max;
+/*     dsc->cache_size = overrides->cache_size ?
+ overrides->cache_size : base->cache_size;
+    dsc->cache_free = overrides->cache_free ?
+ overrides->cache_free : base->cache_free;  */
+    dsc->upload_max = overrides->upload_max ?
+	overrides->upload_max : base->upload_max;
 
-    dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name;
-    dsc->upload_dir = overrides->upload_dir ? overrides->upload_dir : base->upload_dir;
+    dsc->server_name = overrides->server_name ?
+	overrides->server_name : base->server_name;
+    dsc->upload_dir = overrides->upload_dir ?
+	overrides->upload_dir : base->upload_dir;
 
     return dsc;
 }
@@ -1050,19 +969,22 @@ void dtcl_child_init(server_rec *s, pool *p)
 	if (dsc->dtcl_child_init_script != NULL)
 	    if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
 		ap_log_error(APLOG_MARK, APLOG_ERR, s,
-			     "Problem running child init script: %s", Tcl_GetString(dsc->dtcl_child_init_script));
+			     "Problem running child init script: %s",
+			     Tcl_GetString(dsc->dtcl_child_init_script));
 	sr = sr->next;
     }
 }
 
 void dtcl_child_exit(server_rec *s, pool *p)
 {
-    dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)
+	ap_get_module_config(s->module_config, &dtcl_module);
 
     if (dsc->dtcl_child_exit_script != NULL)
 	if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_exit_script, 0) != TCL_OK)
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
-			 "Problem running child exit script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_exit_script, NULL));
+			 "Problem running child exit script: %s",
+			 Tcl_GetStringFromObj(dsc->dtcl_child_exit_script, NULL));
 }
 
 const handler_rec dtcl_handlers[] =

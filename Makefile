@@ -14,7 +14,7 @@ STATICLIB=mod_dtcl.a
 SHLIB=mod_dtcl$(TCL_SHLIB_SUFFIX)
 
 APREQ_OBJECTS=apache_cookie.o apache_multipart_buffer.o apache_request.o
-OBJECTS=mod_dtcl.o tcl_commands.o parser.o $(APREQ_OBJECTS)
+OBJECTS=mod_dtcl.o tcl_commands.o parser.o channel.o $(APREQ_OBJECTS)
 
 # The following TCL_* variables are all exported from builddtcl.sh
 
@@ -37,11 +37,13 @@ apache_multipart_buffer.o: apache_multipart_buffer.c apache_multipart_buffer.h
 	$(COMPILE)
 apache_request.o: apache_request.c apache_request.h
 	$(COMPILE)
-mod_dtcl.o: mod_dtcl.c mod_dtcl.h tcl_commands.h apache_request.h parser.h
+mod_dtcl.o: mod_dtcl.c mod_dtcl.h tcl_commands.h apache_request.h parser.h parser.h
 	$(COMPILE) -DDTCL_VERSION=`cat VERSION`
 tcl_commands.o: tcl_commands.c tcl_commands.h mod_dtcl.h
 	$(COMPILE)
 parser.o: parser.c mod_dtcl.h parser.h
+	$(COMPILE)
+channel.o: channel.c mod_dtcl.h channel.h
 	$(COMPILE)
 
 clean: 
