@@ -8,8 +8,7 @@
 # You must change the following line unless you have the Debian
 # apache-dev package
 
-INCLUDES=-I/usr/include/apache-1.3/
-INCDIR=$(SRCDIR)/include
+INC=$(INCLUDES) -I$(TCL_SRC_DIR)
 
 STATICLIB=mod_dtcl.a
 SHLIB=mod_dtcl$(TCL_SHLIB_SUFFIX)
@@ -19,7 +18,7 @@ OBJECTS=mod_dtcl.o tcl_commands.o $(APREQ_OBJECTS)
 
 # The following TCL_* variables are all exported from builddtcl.sh
 
-COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNING) $(TCL_SHLIB_CFLAGS) -c $(INCLUDES) $(CFLAGS) $(TCL_EXTRA_CFLAGS) $<
+COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNING) $(TCL_SHLIB_CFLAGS) -c $(INC) $(CFLAGS) $(TCL_EXTRA_CFLAGS) $<
 
 all: builddtcl_test shared
 

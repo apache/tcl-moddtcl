@@ -44,7 +44,7 @@ INC=/usr/include/apache-1.3/  ######### CHANGEME ##########
 if [ -f $INC/httpd.h ] 
     then
     echo "Apache includes in $INC"
-    export INCLUDES="-I$INC -I$APACHE/src/os/unix/"
+    export INCLUDES="-I$INC"
     else
     echo "Apache include files *not* in $INC, please edit builddtcl.sh"
     exit 1
@@ -69,6 +69,7 @@ export TCL_SHLIB_CFLAGS
 export TCL_SHLIB_LD
 export TCL_SHLIB_SUFFIX
 export TCL_STLIB_LD 
+export TCL_SRC_DIR
 
 export BUILDDTCL="YES"
 #export C_INCLUDE_PATH
