@@ -20,7 +20,8 @@ if [ "$TCLSHEXIST" != "helloworld" ]
     echo "Using $TCLSH as tclsh program"
 fi
 
-# Location of Apache source install (for static installs)
+# Location of Apache source install (for static installs - you can
+# comment this out for shared lib installs
 export APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
 # APACHE=/usr/local/src/apache-1.3/
 

@@ -1,5 +1,5 @@
 #!/usr/bin/tclsh
-# By David N. Welton <davidw@linuxcare.com>
+# By David N. Welton <davidw@prosa.it>
 # $Id$
 
 # This is a script to aid in keeping a coherent version number

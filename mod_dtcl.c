@@ -60,7 +60,7 @@
 
 /* $Id$  */
 
-/* http_dtcl.c by David Welton <davidw@efn.org> - originally mod_include.  */
+/* mod_dtcl.c by David Welton <davidw@prosa.it> - originally mod_include.  */
 /* Changes, improvements and bugfixes by Rolf Ade, Paolo Brutti and Patrick Diamond. */
 /* Windows stuff by Jan Nijtmans. */
 
@@ -605,7 +605,7 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
     }
     if (headers_printed != 0)
     {
-	print_error(global_rr, 0, "Cannot manipulate headers - already sent");
+	Tcl_AddObjErrorInfo(interp, "Cannot manipulate headers - already sent", -1);
 	return TCL_ERROR;
     }
     opt = Tcl_GetStringFromObj(objv[1], NULL);
@@ -632,6 +632,11 @@ static int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj 
 	/* SetCookie: foo=bar; EXPIRES=DD-Mon-YY HH:MM:SS; DOMAIN=domain; PATH=path; SECURE */
 
 	val = Tcl_GetString(objv[3]);
+	if (objv[2]->length == 0) 
+	{
+	    Tcl_AddObjErrorInfo(interp, "Need a name for cookie", -1);
+	    return TCL_ERROR;
+	}
 	cookie = ap_pstrcat(global_rr->pool, cgiEncodeObj(objv[2]), "=", cgiEncodeObj(objv[3]), NULL);
 
 	for (i = 4; i < objc; i++)
