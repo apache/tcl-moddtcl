@@ -1,7 +1,7 @@
 Source: libapache-mod-dtcl
 Section: unknown
 Priority: optional
-Maintainer: David N. Welton <davidw@efn.org>
+Maintainer: David N. Welton <davidw@debian.org>
 Standards-Version: 2.5.0
 
 Package: libapache-mod-dtcl

@@ -1,274 +1,361 @@
-<!-- $Id -->
-    <h2>mod_dtcl Documentation</h2>
-    
-    <h3>1) Installation</h3>
-    <ol>
-      <li><b>Check dependencies</b><br>
-	
-	To install mod_dtcl, you will need <b>Tcl 8.2</b> or greater
-	and <b>Apache 1.3.xx</b>.  It is known to run on Linux,
-	FreeBSD, OpenBSD, and Solaris and HPUX.  NT is also possible -
-	please see the directions in the distribution.
-      </li>
-
-      <li><b>Get mod_dtcl</b><br>
-
-	If you are running a Debian or FreeBSD system, there
-	are pre-built packages available at:
-	<a href="http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html">http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html</a> 
-
-	or
-	
-	<a
-	href="http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1">http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1</a>.<br>
-	Otherwise, download the sources at <a href="download/">http://tcl.apache.org/mod_dtcl/download/</a>.
-      <br>
-      </li>
-      <li><b>Uncompress the sources</b><br>
-	<code>
-	  gunzip apache-1.3.X.tar.gz<br>
-	  tar -xvf apache-1.3.X.tar.gz<br>
-	</code>
-	You don't need the Apache sources if you are building a shared
-	object module.
-	<code>
-	  gunzip mod_dtcl-X.X.X.tar.gz<br>
-	  tar -xvf mod_dtcl-X.X.X.tar.gz<br>
-	</code>
-      </li>
-
-      <li><b>Configure, Edit builddtcl.sh and Make</b><br> 
-	<code>
-	  cd apache-1.3.X/<br>
-	  ./configure<br>
-	</code><br>
-
-	<code>cd ../mod_dtcl/<br></code>
-	Now edit the <code>builddtcl.sh</code> script.  The 3
-	variables you may need to change are: 
-	<ul>
-	  <li><code>TCLSH</code><br>
-	    Name of the tclsh program on your computer.
-	  </li>
-	  <li><code>APACHE</code><br>
-	    Location of the Apache sources (for static builds only).
-	  </li>
-	  <li><code>INC</code><br>
-	    Location of the Apache headers (you will need this even
-	    for building shared objects).
-	  </li>
-	</ul>
-
-	<code>
-	  ./builddtcl.sh static
-	</code> (<code>shared</code> in place of <code>static</code>
-	if you are building a shared object module<br>
-
-	<code>
-	  ./builddtcl.sh install
-	</code> (Not necessary if it is a shared object build)<br>
-
-	<code>cd ../apache-1.3.X<br></code>
-	<code>./configure
-	--activate-module=src/modules/mod_dtcl/mod_dtcl.a [ other configure
-	options ]<br></code>
-	<code>export EXTRA_LIBS="-ltcl8.X -lm"</code><br>
-	<code>make -e<br></code>
-	<code>make install<br></code>
-      </li>
-      <li><b>Configure Apache<br></b>		
-	<ul>
-	  <li>
-	    <b>http.conf</b><br> <code>LoadModule dtcl_module
-	      /usr/lib/apache/1.3/mod_dtcl.so</code><br> 
-	    This points Apache to the shared object if
-	    mod_dtcl is being used as a loadable module.
-	  </li>
-	  <li>
-	    <b>srm.conf</b><br> 
-	    <code>AddType application/x-httpd-tcl .ttml</code><br>
-	    <code>AddType application/x-dtcl-tcl .tcl</code>
-	    (optional)<br>
-	    These add the .ttml and .tcl (if desired) types to
-	    Apache, so that they are processed by mod_dtcl.
-	  </li>
-	</ul>
-      </li>
-
-    </ol>
-
-
-    <h3>2) Apache Directives</h3>
-
-    <ul>
-      <li>
-	<code><b>Dtcl_Script GlobalInitScript <i>"script"</i></code></b><br>
-	Tcl script that is run when each interpreter is
-	initialized.  <code>"script"</code> is actual Tcl
-	script, so to run a file, you would do
-	<code>Dtcl_Script GlobalInitScript "source /var/www/foobar.tcl"</code>.
-      </li>
-
-      <li>
-	<code><b>Dtcl_Script ChildInitScript <i>"script"</i></b></code><br>		
-	Script to be evaluated when each apache child is
-	initialized. This is the best place to load modules.
-      </li>
-
-      <li>
-	<code><b>Dtcl_Script ChildExitScript <i>"script"</i></b></code><br>	      
-	Script to be evaluated when each apache child exits.
-      </li>
-
-      <li>
-	<code><b>Dtcl_Script BeforeScript <i>"script"</i></b></code><br>		
-	Script to be evaluated before each .ttml page.
-	<strong>Note</strong> that you cannot use
-	<code>hputs</code> in the BeforeScript, but must
-	instead use <code>buffer_add</code>.
-      </li>
-
-      <li>
-	<code><b>Dtcl_Script AfterScript <i>"script"</i></b></code><br>	      
-	Script to be called after each .ttml page.
-      </li>
+<!-- $Id$ -->
+      <h2>mod_dtcl Documentation</h2>
       
-      <li>
-	<code><b>Dtcl_CacheSize <i>cachesize</i></b></code><br> 
-	Number of ttml scripts to cache as Tcl Objects.
-	Default is MaxRequestsPerChild / 2, or 50, if
-	MaxRequestsPerChild is 0.
-      </li>
+      <h3>1) Installation</h3>
+      <ol>
+	<li><b>Check dependencies</b><br>
+	  
+	  To install mod_dtcl, you will need <b>Tcl 8.2</b> or greater
+	  and <b>Apache 1.3.xx</b>.  It is known to run on Linux,
+	  FreeBSD, OpenBSD, and Solaris and HPUX.  NT is also possible -
+	  please see the directions in the distribution.
+	</li>
 
-    </ul>
+	<li><b>Get mod_dtcl</b><br>
 
-    <h3>3) mod_dtcl specific Tcl commands</h3>
+	  If you are running a Debian or FreeBSD system, there
+	  are pre-built packages available at:
+	  <a href="http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html">http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html</a> 
 
-    <ul>
-      <li>
-	<code><b>buffer_add <i>string</i></b></code><br>	      
-	Add text to output_buffer for later printing. Used
-	internally.
-      </li>
+	  or
+	  
+	  <a
+	     href="http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1">http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1</a>.<br>
+	  Otherwise, download the sources at <a href="download/">http://tcl.apache.org/mod_dtcl/download/</a>.
+	  <br>
+	</li>
+	<li><b>Uncompress the sources</b><br>
+	  <code>
+	    gunzip apache-1.3.X.tar.gz<br>
+	    tar -xvf apache-1.3.X.tar.gz<br>
+	  </code>
+	  You don't need the Apache sources if you are building a shared
+	  object module.  You do, however, need the header files.
+	  Some systems, such as Debian GNU/Linux, provide these
+	  independently - otherwise, you probably still need the sources.<br>
+	  <code>
+	    gunzip mod_dtcl-X.X.X.tar.gz<br>
+	    tar -xvf mod_dtcl-X.X.X.tar.gz<br>
+	  </code>
+	</li>
 
-      <li>
-	<code><b>hputs <i>?-error? text</i></b></code><br>	      
-	The mod_dtcl version of "puts".  Outputs to the
-	client, instead of to stdout.
-	The error option permits you to send an 'error message' to the
-	apache log file, at the NOTICE level.
-      </li>
-      <li>
-	<code><b>hgetvars</b></code><br>
-	Get environmental, CGI and Cookie variables. This is
-	in a seperate command so as not to make the server do
-	this every time you load a .ttml file. ENVS, VARS, and
-	COOKIES are the associative arrays created.  ENVS
-	contains environmental variables, VARS contains all
-	the 'cgi' variables, and COOKIES, any cookies recieved
-	from the client. 
-      </li>
-      <li>
-	<code><b>include <i>filename</i></b></code><br>	      
-	Include a file without parsing it.  This is the best
-	way to include an HTML file or any other static content.
-      </li>
-      <li>
-	<code><b>parse <i>filename</i></b></code><br>	      
-	"Source" a .ttml file.  This is the way to include
-	other .ttml files.
-      </li>
-      <li>
-	<code><b>hflush</b></code><br>	      
-	Flush the output buffers to the client.  Use this if
-	you want to incrementally update a page.
-      </li>
-      <li>
-	<code><b>headers redirect <i>uri</i></b></code><br>	      
+	<li><b>Configuring, builddtcl.sh, etc...</b><br> 
 
-	Redirect from the current page to a new
-	URI. <b>Must</b> be done in the first block of TCL code.
-      </li>
-      <li>
-	<code><b>headers setcookie <i>cookie-name
-	      cookie-value ?-expires date/time? ?-domain domain?
-	      ?-path path? ?-secure?</i></b></code><br>
+	  Do you want to build mod_dtcl as a shared object (such as a
+	  .so file on Linux, or a .dll on windows), or compile it
+	  directly as a part of the Apache executable?  The Apache
+	  Software Foundation has put together a nice <a
+	  href="http://httpd.apache.org/docs/dso.html">manual</a>
+	  which explains things in detail.
 
-	This command is for setting cookies.  Cookie-name is
-	the name of the cookie, cookie-value is the data
-	associated with the variable.  Expires sets an
-	expiration date for the cookie, and must be in the
-	format 'DD-Mon-YY HH:MM:SS', path sets the path for
-	which the cookie is valid, and secure specifies that
-	the cookie is only to be transmitted if the connection
-	is secure (HTTPS).
-      </li>
-      <li>
-	<code><b>headers type
-	    <i>content-type</i></b></code><br>
+	  <ul>
+	    <li><b>For shared objects</b><br>
+	      
+	      <code>cd ../mod_dtcl/<br></code>
+	      Edit the <code>builddtcl.sh</code> script.  The 3
+	      variables you may need to change are: 
+	      <ul>
+		<li><code>TCLSH</code><br>
+		  Name of the tclsh program on your computer.
+		</li>
+		<li><code>APACHE</code><br>
+		  Location of the Apache sources (for static builds only).
+		</li>
+		<li><code>INC</code><br>
+		  Location of the Apache headers (you will need this even
+		  for building shared objects).
+		</li>
+	      </ul>
 
-	This command sets the "Content-type:" header returned
-	by the script, which is useful if you wish to create a
-	PNG (image), for example, with mod_dtcl.
-      </li>
-      <li>
-	<code><b>headers set <i>headername value</i></b></code><br>
+	      <code>
+		./builddtcl.sh shared
+	      </code><br>
 
-	Set arbitrary header names and values.
-      </li>
+	      <code>
+		cp mod_dtcl.so
+		/usr/lib/apache/wherever/the/other/shared/objects/reside
+		</code> For shared object builds, you need to copy the
+		object into the directory where the other shared
+		objects are kept for your Apache build.  On Debian
+		GNU/Linux systems, for instance, this is in
+		<code>/usr/lib/apache/1.3/</code>.
 
-      <li>
-	<code><b>dtcl_info</b></code><br>	      
+	    </li>
+	    
+	    <li><b>For static builds</b><br>
+	      <code>
+		cd apache-1.3.X/<br>
+		./configure<br>
+	      </code>
 
-	Prints information on the internals of the module in
-	HTML.  Currently, only the PID and size of the object
-	cache are reported.
-      </li>
-    </ul>
+	      <code>cd ../mod_dtcl/<br></code>
+	      Edit the <code>builddtcl.sh</code> script.  The 3
+	      variables you may need to change are: 
+	      <ul>
+		<li><code>TCLSH</code><br>
+		  Name of the tclsh program on your computer.
+		</li>
+		<li><code>APACHE</code><br>
+		  Location of the Apache sources (for static builds only).
+		</li>
+		<li><code>INC</code><br>
+		  Location of the Apache headers (you will need this even
+		  for building shared objects).
+		</li>
+	      </ul>
 
-    <h3>4) Internals</h3>
-    <ul>
-      <li><b>Read the code!</b></li>
-      <li>		
-	<b>Initialization</b><br>
+	      <code>
+		./builddtcl.sh static
+	      </code><br>
 
-	When Apache is started, (or when child Apache
-	processes are started if a threaded Tcl is used),
-	<code>tcl_init_stuff</code> is called, which creates
-	a new interpreter, and initializes various things,
-	like the <code>apache_channel</code> channel system.
-	The caching system is also set up, and if there is a
-	GlobalScript, it is run.
-      </li>
-      <li><b>Achan/apache_channel</b><br>
+	      <code>
+		./builddtcl.sh install
+	      </code><br>
 
-	The "Apache Channel" system was created so that it is
-	possible to have an actual Tcl channel that we could
-	redirect standard output to.  This lets us use, for
-	instance, the regular "puts" command in .ttml pages.
-	It works by creating commands that write to memory
-	that is slated to be sent to the client.
-      </li>
+	      <code>cd ../apache-1.3.X<br></code>
+	      <code>./configure
+		--activate-module=src/modules/mod_dtcl/mod_dtcl.a [ other configure
+		options ]<br></code>
+	      <code>export EXTRA_LIBS="-ltcl8.X -lm"</code><br>
+	      <code>make -e<br></code>
+	      <code>make install<br></code>
+	      
+	    </li>
+	  </ul>
+	</li>
+	<li><b>Configure Apache<br></b>		
+	  <ul>
+	    <li>
+	      <b>http.conf</b><br> <code>LoadModule dtcl_module
+		/usr/lib/apache/1.3/mod_dtcl.so</code><br> 
+	      This points Apache to the shared object if
+	      mod_dtcl is being used as a loadable module.
+	    </li>
+	    <li>
+	      <b>srm.conf</b><br> 
+	      <code>AddType application/x-httpd-tcl .ttml</code><br>
+	      <code>AddType application/x-dtcl-tcl .tcl</code>
+	      (optional)<br>
+	      These add the .ttml and .tcl (if desired) types to
+	      Apache, so that they are processed by mod_dtcl.
+	    </li>
+	  </ul>
+	</li>
 
-      <li><b>Page parsing/execution</b><br>
+      </ol>
 
-	In <code>send_parsed_file</code> Each .ttml file is
-	loaded and run within its own namespace.  No new
-	interpreter is created for each page.  This lets you
-	share variables, and most importantly, loaded modules,
-	from a common parent (such as one of the InitScripts).
-	When a file is loaded, it is transformed into a Tcl
-	script by putting everything outside of &lt;+ and
-	+&gt; into large hputs statements.  When the script is
-	complete, it is then inserted into the cache, for
-	future use.  In fact, if the file modification
-	information doesn't change, mod_dtcl will execute the
-	cached version of the script the next time it is
-	encountered.
-      </li>
-      <li><b>Binary data</b><br>
-	mod_dtcl is capable of outputing binary data, such as
-	images, or loading binary data with 'include'.
-      </li>
-    </ul>
-    
+
+      <h3>2) Apache Directives</h3>
+
+      <ul>
+	<li>
+	  <code><b>Dtcl_Script GlobalInitScript <i>"script"</i></code></b><br>
+	  Tcl script that is run when each interpreter is
+	  initialized.  <code>"script"</code> is actual Tcl
+	  script, so to run a file, you would do
+	  <code>Dtcl_Script GlobalInitScript "source /var/www/foobar.tcl"</code>.
+	</li>
+
+	<li>
+	  <code><b>Dtcl_Script ChildInitScript <i>"script"</i></b></code><br>		
+	  Script to be evaluated when each apache child is
+	  initialized. This is the best place to load modules.
+	</li>
+
+	<li>
+	  <code><b>Dtcl_Script ChildExitScript <i>"script"</i></b></code><br>	      
+	  Script to be evaluated when each apache child exits.
+	</li>
+
+	<li>
+	  <code><b>Dtcl_Script BeforeScript <i>"script"</i></b></code><br>		
+	  Script to be evaluated before each .ttml page.
+	  <strong>Note</strong> that you cannot use
+	  <code>hputs</code> in the BeforeScript, but must
+	  instead use <code>buffer_add</code>.
+	</li>
+
+	<li>
+	  <code><b>Dtcl_Script AfterScript <i>"script"</i></b></code><br>	      
+	  Script to be called after each .ttml page.
+	</li>
+	
+	<li>
+	  <code><b>Dtcl_CacheSize <i>cachesize</i></b></code><br> 
+	  Number of ttml scripts to cache as Tcl Objects.
+	  Default is MaxRequestsPerChild / 2, or 50, if
+	  MaxRequestsPerChild is 0.
+	</li>
+
+      </ul>
+
+      <h3>3) mod_dtcl specific Tcl commands and variables</h3>
+
+      <ul>
+	<li>
+	  <code><b>buffer_add <i>string</i></b></code><br>	      
+	  Add text to output_buffer for later printing. Used
+	  internally.
+	</li>
+
+	<li>
+	  <code><b>hputs <i>?-error? text</i></b></code><br>	      
+	  The mod_dtcl version of "puts".  Outputs to the
+	  client, instead of to stdout.
+	  The error option permits you to send an 'error message' to the
+	  apache log file, at the NOTICE level.
+	</li>
+	<li>
+	  <code><b>hgetvars</b></code><br>
+	  Get environmental, CGI and Cookie variables. This is
+	  in a seperate command so as not to make the server do
+	  this every time you load a .ttml file. ENVS, VARS, and
+	  COOKIES are the associative arrays created.  ENVS
+	  contains environmental variables, VARS contains all
+	  the 'cgi' variables, and COOKIES, any cookies recieved
+	  from the client. 
+	</li>
+	<li>
+	  <code><b>include <i>filename</i></b></code><br>	      
+	  Include a file without parsing it.  This is the best
+	  way to include an HTML file or any other static content.
+	</li>
+	<li>
+	  <code><b>parse <i>filename</i></b></code><br>	      
+	  "Source" a .ttml file.  This is the way to include
+	  other .ttml files.
+	</li>
+	<li>
+	  <code><b>hflush</b></code><br>	      
+	  Flush the output buffers to the client.  Use this if
+	  you want to incrementally update a page.
+	</li>
+	<li>
+	  <code><b>headers redirect <i>uri</i></b></code><br>	      
+
+	  Redirect from the current page to a new
+	  URI. <b>Must</b> be done in the first block of TCL code.
+	</li>
+	<li>
+	  <code><b>headers setcookie <i>cookie-name
+		cookie-value ?-expires date/time? ?-domain domain?
+		?-path path? ?-secure?</i></b></code><br>
+
+	  This command is for setting cookies.  Cookie-name is
+	  the name of the cookie, cookie-value is the data
+	  associated with the variable.  Expires sets an
+	  expiration date for the cookie, and must be in the
+	  format 'DD-Mon-YY HH:MM:SS', path sets the path for
+	  which the cookie is valid, and secure specifies that
+	  the cookie is only to be transmitted if the connection
+	  is secure (HTTPS).
+	</li>
+	<li>
+	  <code><b>headers type
+	      <i>content-type</i></b></code><br>
+
+	  This command sets the "Content-type:" header returned
+	  by the script, which is useful if you wish to create a
+	  PNG (image), for example, with mod_dtcl.
+	</li>
+	<li>
+	  <code><b>headers set <i>headername value</i></b></code><br>
+
+	  Set arbitrary header names and values.
+	</li>
+
+	<li>
+	  <code><b>dtcl_info</b></code><br>	      
+
+	  Prints information on the internals of the module in
+	  HTML.  Currently, only the PID and size of the object
+	  cache are reported.
+	</li>
+
+	<li>
+	  <code><b>$::request::UPLOAD(filename)</b></code><br>
+	  The filename of the uploaded file.
+	  <code><b>$::request::UPLOAD(name)</b></code><br>
+	  The form variable name of the upload.
+	  <code><b>$::request::UPLOAD(size)</b></code><br>
+	  The size of the uploaded file.
+	  <code><b>$::request::UPLOAD(type)</b></code><br>
+	  The content type of the file upload. <i>Not always available!</i>
+	  <code><b>$::request::UPLOAD(channelname)</b></code><br>
+	  The name of a Tcl channel which may be used to manipulate
+	  the uploaded file.
+	</li>
+
+      </ul>
+
+      <h3>4) Internals</h3>
+      <ul>
+	<li><b>Read the code!</b></li>
+	<li>		
+	  <b>Initialization</b><br>
+
+	  When Apache is started, (or when child Apache
+	  processes are started if a threaded Tcl is used),
+	  <code>tcl_init_stuff</code> is called, which creates
+	  a new interpreter, and initializes various things,
+	  like the <code>apache_channel</code> channel system.
+	  The caching system is also set up, and if there is a
+	  GlobalScript, it is run.
+	</li>
+	<li><b>Achan/apache_channel</b><br>
+
+	  The "Apache Channel" system was created so that it is
+	  possible to have an actual Tcl channel that we could
+	  redirect standard output to.  This lets us use, for
+	  instance, the regular "puts" command in .ttml pages.
+	  It works by creating commands that write to memory
+	  that is slated to be sent to the client.
+	</li>
+
+	<li><b>Page parsing/execution</b><br>
+
+	  In <code>send_parsed_file</code> Each .ttml file is
+	  loaded and run within its own namespace.  No new
+	  interpreter is created for each page.  This lets you
+	  share variables, and most importantly, loaded modules,
+	  from a common parent (such as one of the InitScripts).
+	  When a file is loaded, it is transformed into a Tcl
+	  script by putting everything outside of &lt;+ and
+	  +&gt; into large hputs statements.  When the script is
+	  complete, it is then inserted into the cache, for
+	  future use.  In fact, if the file modification
+	  information doesn't change, mod_dtcl will execute the
+	  cached version of the script the next time it is
+	  encountered.
+	</li>
+	<li><b>Binary data</b><br>
+	  mod_dtcl is capable of outputing binary data, such as
+	  images, or loading binary data with 'include'.
+	</li>
+      </ul>
+      
+      <h3>5) Getting Help</h3>
+      <ul>
+	<li><b>Mailing list</b><br>
+	  <p>
+	    The mod_dtcl mailing list is the best place to go for help
+	    when you have problems.
+	  </p>
+	  <p>
+	    See the <a
+		       href="http://tcl.apache.org/mod_dtcl/contact.ttml">Contact</a>
+		       page for information on sending
+		       mail/subscribing.
+	  </p>
+	  <p>
+	    Mailing list archives are also available at <a
+	    href="http://archive.covalent.net">http://archive.covalent.net</a>,
+	    at the bottom of the page.
+	  </p>
+	</li>
+      </ul>
+
+      <!--
+      Local Variables: ***      
+      End: ***
+      -->

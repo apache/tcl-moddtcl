@@ -7,8 +7,7 @@ package=libapache-mod-dtcl
 
 build:
 	$(checkdir)
-	make other DEBUG_SCRIPT_DIR="/usr/lib/mod_dtcl/"
-	make CFLAGS="-O2 -g -Wall"
+	./builddtcl.sh
 	touch build
 
 clean:
