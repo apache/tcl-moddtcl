@@ -536,7 +536,9 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
            on... */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), 
+			 strlen(key) < strlen(parms[i].key) ? 
+			 strlen(parms[i].key) : strlen(key)))
 	    {
 		/* The following makes sure that we get one string,
                    with no sub lists. */
