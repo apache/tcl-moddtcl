@@ -1,4 +1,4 @@
-libapache-mod-dtcl (0.11.1-2) unstable; urgency=low
+libapache-mod-dtcl (0.11.2-1) unstable; urgency=low
 
   * Minor updates.
   * Fixes build variables: (closes: #102200)
