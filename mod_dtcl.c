@@ -965,6 +965,8 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
     static int tmpfilefd = 0;
     static char *tmpfilename = NULL;
 
+    static unsigned int length_output = 0;
+
     char *baseptr = NULL;
     char *line = NULL;
     char *end = NULL;
@@ -1146,6 +1148,12 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 		    } else {
 			write(tmpfilefd, line, sz);
 		    }
+		    length_output += sz;
+		    if (length_output > upload_max && upload_max != 0)
+		    {
+			errstr = "File upload size exceeded limit";
+			goto multi_error;
+		    }
 		}
 	    } 
 	}
@@ -1168,6 +1176,12 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 	    
 	    acumlen += buflen;
 	}
+	length_output += buflen;
+	if (length_output > upload_max && upload_max != 0)
+	{
+	    errstr = "File upload size exceeded limit";
+	    goto multi_error;
+	}       
 	buflen = 0;
 	free(buffer);
 	buffer = NULL;
@@ -1205,6 +1219,9 @@ cleanup:
 	close(tmpfilefd);
     tmpfilefd = 0;
     tmpfilename = ap_pstrcat(r->pool, upload_dir, DTCLUPLOAD, NULL);
+
+    length_output = 0;
+
     return retval;
 }
 
