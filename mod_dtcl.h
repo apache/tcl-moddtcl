@@ -13,11 +13,6 @@
 
 /* Configuration options  */
 
-/* If you do not have a threaded Tcl, you can define this to 0.  This
-   has the effect of running Tcl Init code in the main parent init
-   handler, instead of in child init handlers. */
-#define THREADED_TCL 0
-
 /* If you want all 'environmental' variables to be accessed through
    the ENVS array, set this to 1.  Note that this could be a security
    risk for scripts which depend on these values, as they could be
