@@ -50,6 +50,11 @@ set testfilename "dtcl-test.ttml"
     regexp -line {^VARS\(Más\) = Tú$} [ ::http::data $page ]
 } 1
 
+::tcltest::test multivariables-1.1 {multiple variables: foo=1&foo=2} {
+    set page [ ::http::geturl "${urlbase}$testfilename?foobar=1&foobar=2&foobar=foo+bar" ]
+    regexp -line {^VARS\(foobar\) = 1 2 foo bar$} [ ::http::data $page ]
+} 1
+
 ::tcltest::test env-1.1 {Environment variable} {
     set page [ ::http::geturl "${urlbase}$testfilename" ]
     regexp -line "^ENVS\\(DOCUMENT_NAME\\) = $testfilename\$" [ ::http::data $page ]
