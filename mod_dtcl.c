@@ -326,14 +326,24 @@ char *StringToUtf(char *input)
 }
 
 /* Function to be used should we desire to upload files to a variable */
-int dtcl_upload_hook(void *ptr, char *buf, int len)
+int dtcl_upload_hook(void *ptr, char *buf, int len, const ApacheUpload *upload)
 {
     Tcl_Interp *interp = ptr;
+    static void *oldptr;
+    int flag = 0;
+
+    /* if there is not a new file being added, keep adding it to the
+       same list element.  Otherwise, start a new list element */
+    if (oldptr != upload)
+	flag = TCL_LIST_ELEMENT|TCL_APPEND_VALUE;
+    else
+	flag = TCL_APPEND_VALUE;
+
     Tcl_ObjSetVar2(interp,
 		   Tcl_NewStringObj("::request::UPLOAD", -1),
 		   Tcl_NewStringObj("data", -1),
 		   Tcl_NewByteArrayObj(buf, len),
-		   TCL_APPEND_VALUE);
+		   flag);
     return len;
 }  
 
@@ -705,8 +715,8 @@ int send_content(request_rec *r)
     req = ApacheRequest_new(r);
    if (upload_files_to_var)
    {
-       req->hookptr = interp;
-       req->ApacheUploadHook = dtcl_upload_hook; 
+       req->hook_data = interp;
+       req->upload_hook = dtcl_upload_hook; 
    }
 
     ApacheRequest___parse(req);
@@ -732,9 +742,9 @@ int send_content(request_rec *r)
     }
    upload = req->upload;
 
-/* while (upload)  */
-    if (upload)
-    {
+   /* Loop through uploaded files */
+   while (upload)
+   {
 	char *type = NULL;
 	char *channelname = NULL;
 	Tcl_Channel chan;
@@ -744,19 +754,19 @@ int send_content(request_rec *r)
 		       Tcl_NewStringObj("::request::UPLOAD", -1),
 		       Tcl_NewStringObj("filename", -1),
 		       Tcl_NewStringObj(upload->filename, -1),
-		       0);
+		       TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
 
 	/* The variable name of the file upload */
 	Tcl_ObjSetVar2(interp,
 		       Tcl_NewStringObj("::request::UPLOAD", -1),
 		       Tcl_NewStringObj("name", -1),
 		       Tcl_NewStringObj(upload->name, -1),
-		       0);
+		       TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
 	Tcl_ObjSetVar2(interp,
 		       Tcl_NewStringObj("::request::UPLOAD", -1),
 		       Tcl_NewStringObj("size", -1),
 		       Tcl_NewIntObj(upload->size),
-		       0);
+		       TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
 	type = (char *)ap_table_get(upload->info, "Content-type");
 	if (type)
 	{
@@ -764,7 +774,7 @@ int send_content(request_rec *r)
 			   Tcl_NewStringObj("::request::UPLOAD", -1),
 			   Tcl_NewStringObj("type", -1),
 			   Tcl_NewStringObj(type, -1), /* kill end of line */
-			   0);
+			   TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
 	}
 	if (!upload_files_to_var)
 	{
@@ -775,10 +785,10 @@ int send_content(request_rec *r)
 			   Tcl_NewStringObj("::request::UPLOAD", -1),
 			   Tcl_NewStringObj("channelname", -1),
 			   Tcl_NewStringObj(channelname, -1), /* kill end of line */
-			   0);
+			   TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
 	}
 	
-	/* upload = upload->next;  */
+	upload = upload->next;
     }
 
     if(!strcmp(r->content_type, "application/x-httpd-tcl"))
