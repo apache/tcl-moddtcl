@@ -49,6 +49,46 @@
 	<code><b>var all</b></code><br>
 	Return a list of variable names and values.
       </li>
+
+      <li><code><b>upload</b></code><br> These commands retrieve or
+	retrieve information about files that have been uploaded to
+	the server.  They replace the <code>UPLOAD</code> variable.
+      </li>
+      <li>
+	<code><b>upload get <i>varname</i> channel</b></code><br>
+	Returns a Tcl channel that can be used to access the uploaded file.
+      </li>
+      <li>
+	<code><b>upload get <i>varname</i> save <i>name</i></b></code><br>
+	Moves the uploaded file to the give name.
+      </li>
+      <li>
+	<code><b>upload get <i>varname</i> data</b></code><br>
+	Returns data uploaded to the server.  This is binary clean.
+      </li>
+
+      <li>
+	<code><b>upload info <i>varname</i> exists</b></code><br>
+	Returns 1 if the variable exists, 0 if not.
+      </li>
+      <li>
+	<code><b>upload info <i>varname</i> size</b></code><br>
+	Returns the size of the file uploaded.
+      </li>
+      <li>
+	<code><b>upload info <i>varname</i> type</b></code><br>If the
+	Content-type is set, it is returned, otherwise, an empty
+	string.
+      </li>
+      <li>
+	<code><b>upload info <i>varname</i> filename</b></code><br>
+	Returns the filename on the remote host that uploaded the file.
+      </li>
+      <li>
+	<code><b>upload names</b></code><br> Returns the variable
+	names, as a list, of all the files uploaded.
+      </li>
+
       <li>
 	<code><b>hgetvars</b></code><br> Get environmental, and Cookie
 	variables. This is in a seperate command so as not to make the
@@ -113,7 +153,7 @@
 	HTML.  Currently, only the PID and size of the object
 	cache are reported.
       </li>
-
+<!--
       <li>
 	Note that these variables may be lists if more than one file
 	is uploaded at a time.<br>
@@ -140,7 +180,7 @@
 	Contents of the uploaded file, if Dtcl_UploadFilesToVar is
 	set.<br>
       </li>
-
+-->
     </ul>
   </body>
 </html>

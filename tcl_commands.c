@@ -639,7 +639,8 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	return TCL_ERROR;
     }
     command = Tcl_GetString(objv[1]);
-
+    
+    result = Tcl_NewObj();
     if (!strcmp(command, "get"))
     {
 	char *varname = NULL;
@@ -664,7 +665,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 			ApacheUpload_FILE(upload)), TCL_READABLE);
 		    Tcl_RegisterChannel(interp, chan);
 		    channelname = Tcl_GetChannelName(chan);
-		    result = Tcl_NewStringObj(channelname, -1);
+		    Tcl_SetStringObj(result, channelname, -1);
 		}
 	    } else if (!strcmp(method, "save")) {
 		/* save data to a specified filename  */
@@ -702,7 +703,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 			break;
 		}
 		Tcl_Close(interp, savechan);
-		result = Tcl_NewIntObj(1);
+		Tcl_SetIntObj(result, 1);
 	    } else if (!strcmp(method, "data")) {
 		/* this sucks - we should use the hook, but I want to
                    get everything fixed and working first */
@@ -717,17 +718,15 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		    Tcl_SetChannelOption(interp, chan, "-translation", "binary");
 		    Tcl_SetChannelOption(interp, chan, "-encoding", "binary");
 		    /* put data in a variable  */
-		    result = Tcl_NewObj();
 		    Tcl_ReadChars(chan, result, ApacheUpload_size(upload), 0);
 		} else {
 		    Tcl_AppendResult(interp, "Dtcl_UploadFilesToVar is not set", NULL);
 		    return TCL_ERROR;
 		}
 	    }
-	    Tcl_SetObjResult(interp, result);
 	} else {
 	    /* no variable found  */
-	    Tcl_SetObjResult(interp, Tcl_NewStringObj("", -1));
+	    Tcl_SetStringObj(result, "", -1);
 	}
     } else if (!strcmp(command, "info")) {
 	char *varname = NULL;
@@ -745,32 +744,43 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	{
 	    if (!strcmp(infotype, "exists"))
 	    {
-		result = Tcl_NewIntObj(1);
+		Tcl_SetIntObj(result, 1);
 	    } else if (!strcmp(infotype, "size")) {
-		result = Tcl_NewIntObj(ApacheUpload_size(upload));
+		Tcl_SetIntObj(result, ApacheUpload_size(upload));
 	    } else if (!strcmp(infotype, "type")) {
 		char *type = NULL;
 		type = (char *)ApacheUpload_type(upload);
 		if (type)
-		    result = Tcl_NewStringObj(type, -1);
+		    Tcl_SetStringObj(result, type, -1);
 		else
-		    result = Tcl_NewStringObj("", -1);
+		    Tcl_SetStringObj(result, "", -1);
 	    } else if (!strcmp(infotype, "filename")) {
-		result = Tcl_NewStringObj(upload->filename, -1);
+		Tcl_SetStringObj(result, StringToUtf(upload->filename), -1);
 	    } else {
-		Tcl_AddErrorInfo(interp, "unknown upload info command");
+		Tcl_AddErrorInfo(interp, "unknown upload info command, should be exists|size|type|filename");
 		return TCL_ERROR;
 	    }
 	} else {
 	    if (!strcmp(infotype, "exists")) {
-		result = Tcl_NewIntObj(0);
+		Tcl_SetIntObj(result, 0);
 	    } else {
 		Tcl_AddErrorInfo(interp, "variable doesn't exist");
 		return TCL_ERROR;
 	    }
 	}
-	Tcl_SetObjResult(interp, result);
+    } else if (!strcmp(command, "names")) {
+	upload = ApacheRequest_upload(global_req);
+	while (upload)
+	{
+	    Tcl_ListObjAppendElement(interp, result, 
+				     STRING_TO_UTF_TO_OBJ(upload->name));
+	    upload = upload->next;
+	}
+    } else {
+	Tcl_WrongNumArgs(interp, 1, objv, "upload get|info|names");
+	return TCL_ERROR;
     }
+    Tcl_SetObjResult(interp, result);
     return TCL_OK;
 }
 
