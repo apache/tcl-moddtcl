@@ -23,10 +23,12 @@ fi
 
 # Location of Apache source install (for static installs - you can
 # comment this out for shared lib installs
-export APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
+APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # APACHE=/usr/local/src/apache-1.3/
 APACHE=/
+
+export APACHE
 
 if [ -d $APACHE ]
     then
@@ -44,7 +46,7 @@ INC=/usr/include/apache-1.3/  ######### CHANGEME ##########
 if [ -f $INC/httpd.h ] 
     then
     echo "Apache includes in $INC"
-    export INCLUDES="-I$INC"
+    INCLUDES="-I$INC" ; export INCLUDES
     else
     echo "Apache include files *not* in $INC, please edit builddtcl.sh"
     exit 1
@@ -53,26 +55,26 @@ fi
 # find location of tclConfig.sh, source it, and export variables to
 # make them available to 'make'
 
-export CONFIG=`$TCLSH ./findconfig.tcl`
+CONFIG=`$TCLSH ./findconfig.tcl` ; export CONFIG
 echo "Using tclConfig.sh: $CONFIG"
 . $CONFIG
 
-export TCL_CC
-export TCL_CFLAGS_DEBUG 
-export TCL_CFLAGS_OPTIMIZE 
-export TCL_CFLAGS_WARNING 
-export TCL_EXTRA_CFLAGS
-export TCL_LIBS
-export TCL_LIB_FLAG 
-export TCL_LIB_SPEC
-export TCL_PREFIX
-export TCL_SHLIB_CFLAGS
-export TCL_SHLIB_LD
-export TCL_SHLIB_SUFFIX
-export TCL_STLIB_LD 
-export TCL_SRC_DIR
+TCL_CC ; export TCL_CC
+TCL_CFLAGS_DEBUG  ; export TCL_CFLAGS_DEBUG 
+TCL_CFLAGS_OPTIMIZE  ; export TCL_CFLAGS_OPTIMIZE 
+TCL_CFLAGS_WARNING  ; export TCL_CFLAGS_WARNING 
+TCL_EXTRA_CFLAGS ; export TCL_EXTRA_CFLAGS
+TCL_LIBS ; export TCL_LIBS
+TCL_LIB_FLAG  ; export TCL_LIB_FLAG 
+TCL_LIB_SPEC ; export TCL_LIB_SPEC
+TCL_PREFIX ; export TCL_PREFIX
+TCL_SHLIB_CFLAGS ; export TCL_SHLIB_CFLAGS
+TCL_SHLIB_LD ; export TCL_SHLIB_LD
+TCL_SHLIB_SUFFIX ; export TCL_SHLIB_SUFFIX
+TCL_STLIB_LD  ; export TCL_STLIB_LD 
+TCL_SRC_DIR ; export TCL_SRC_DIR
 
-export BUILDDTCL="YES"
+BUILDDTCL="YES" ; export BUILDDTCL
 #export C_INCLUDE_PATH
 
 # pass the first argument to make
