@@ -32,7 +32,7 @@
 /* Allow <+ +> tags for backwards compatibility.  Use the
    mod_dtcl/contrib/newtags.sh script to update your .ttml files to
    use <? ?> tags. */
-#define USE_OLD_TAGS 1 
+#define USE_OLD_TAGS 0 
 
 /* Turn off 'old-style' $VARS variable handling, and use only the
    'var' command. */

@@ -24,6 +24,10 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
     int ch;
     int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
     int inside = 0;
+    Tcl_DString dstr;
+/*     Tcl_DString convdstr;  */
+
+    Tcl_DStringInit(&dstr);
 
     while ((ch = getc(openfile)) != EOF)
     {
@@ -40,7 +44,7 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 		int nextchar = getc(openfile);
 		if (nextchar == '+')
 		{
-		    Tcl_AppendToObj(outbuf, "\"\n", 2);
+		    Tcl_DStringAppend(&dstr, "\"\n", 2);
 		    inside = 1;
 		    p = 0;
 		    continue;
@@ -55,34 +59,34 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 		if ((++p) == endseqlen)
 		{
 		    /* ok, we have matched the whole ending sequence - do something  */
-		    Tcl_AppendToObj(outbuf, "\"\n", 2);
+		    Tcl_DStringAppend(&dstr, "\"\n", 2);
 		    inside = 1;
 		    p = 0;
 		    continue;
 		}
 	    } else {
 		if (p > 0)
-		    Tcl_AppendToObj(outbuf, (char *)strstart, p);
+		    Tcl_DStringAppend(&dstr, (char *)strstart, p);
 		/* or else just put the char in outbuf  */
 		switch (c)
 		{
 		case '$':
-		    Tcl_AppendToObj(outbuf, "\\$", -1);
+		    Tcl_DStringAppend(&dstr, "\\$", -1);
 		    break;
 		case '[':
-		    Tcl_AppendToObj(outbuf, "\\[", -1);
+		    Tcl_DStringAppend(&dstr, "\\[", -1);
 		    break;
 		case ']':
-		    Tcl_AppendToObj(outbuf, "\\]", -1);
+		    Tcl_DStringAppend(&dstr, "\\]", -1);
 		    break;
 		case '"':
-		    Tcl_AppendToObj(outbuf, "\\\"", -1);
+		    Tcl_DStringAppend(&dstr, "\\\"", -1);
 		    break;
 		case '\\':
-		    Tcl_AppendToObj(outbuf, "\\\\", -1);
+		    Tcl_DStringAppend(&dstr, "\\\\", -1);
 		    break;
 		default:
-		    Tcl_AppendToObj(outbuf, &c, 1);
+		    Tcl_DStringAppend(&dstr, &c, 1);
 		    break;
 		}
 		p = 0;
@@ -97,7 +101,7 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 		int nextchar = getc(openfile);
 		if (nextchar == '>')
 		{
-		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+		    Tcl_DStringAppend(&dstr, "\n hputs \"", -1);
 		    inside = 0;
 		    p = 0;
 		    continue;
@@ -111,7 +115,7 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 	    {
 		if ((++p) == startseqlen)
 		{
-		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+		    Tcl_DStringAppend(&dstr, "\n hputs \"", -1);
 		    inside = 0;
 		    p = 0;
 		    continue;
@@ -121,11 +125,21 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 	    {
 		/*  plop stuff into outbuf, which we will then eval   */
 		if (p > 0)
-		    Tcl_AppendToObj(outbuf, (char *)strend, p);
-		Tcl_AppendToObj(outbuf, &c, 1);
+		    Tcl_DStringAppend(&dstr, (char *)strend, p);
+		Tcl_DStringAppend(&dstr, &c, 1);
 		p = 0;
 	    }
 	}
     }
+
+/*     Tcl_ExternalToUtfDString(NULL, 
+			     Tcl_DStringValue(&dstr),
+			     Tcl_DStringLength(&dstr),
+			     &convdstr);  */
+    
+    Tcl_AppendToObj(outbuf, Tcl_DStringValue(&dstr),
+		    Tcl_DStringLength(&dstr));
+    Tcl_DStringFree(&dstr);
+/*     Tcl_DStringFree(&convdstr);  */
     return inside;
 }
