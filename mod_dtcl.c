@@ -703,11 +703,11 @@ int send_content(request_rec *r)
 
     /* Apache Request stuff */
     req = ApacheRequest_new(r);
-//    if (upload_files_to_var)
-//    {
-    req->hookptr = interp;
-    req->ApacheUploadHook = dtcl_upload_hook; 
-//    }
+   if (upload_files_to_var)
+   {
+       req->hookptr = interp;
+       req->ApacheUploadHook = dtcl_upload_hook; 
+   }
 
     ApacheRequest___parse(req);
     
