@@ -26,6 +26,7 @@ fi
 export APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # APACHE=/usr/local/src/apache-1.3/
+APACHE=/
 
 if [ -d $APACHE ]
     then
@@ -61,6 +62,7 @@ export TCL_CFLAGS_OPTIMIZE
 export TCL_LIB_FLAG
 
 export BUILDDTCL="YES"
+export C_INCLUDE_PATH
 
 # pass the first argument to make
 make -e $1

@@ -3,11 +3,13 @@
 # based on the sample debian/rules file for GNU hello by Ian Jackson.
 # $Id$
 
+TCL_VERSION=8.3
+
 package=libapache-mod-dtcl
 
 build:
 	$(checkdir)
-	./builddtcl.sh
+	( export C_INCLUDE_PATH=/usr/include/tcl$(TCL_VERSION)/ ; ./builddtcl.sh )
 	touch build
 
 clean:
