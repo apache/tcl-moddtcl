@@ -1,3 +1,11 @@
+libapache-mod-dtcl (0.8.12-1) unstable; urgency=low
+
+  * Various cookie fixes.
+  
+  * New build system.
+  
+ -- David N. Welton <davidw@prosa.it>  Sun,  5 Nov 2000 23:48:11 +0100
+
 libapache-mod-dtcl (0.8.8-2) unstable; urgency=low
 
   * Code to deal with before/after scripts.

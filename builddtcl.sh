@@ -3,6 +3,7 @@
 
 # Name of tclsh - on FreeBSD, this is probably tclsh8.2
 TCLSH=tclsh  ######### CHANGEME ##########
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 TCLSH=`which $TCLSH`
 
 if [ "$TCLSH" = "" ]
@@ -23,6 +24,7 @@ fi
 # Location of Apache source install (for static installs - you can
 # comment this out for shared lib installs
 export APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # APACHE=/usr/local/src/apache-1.3/
 
 if [ -d $APACHE ]
@@ -35,6 +37,7 @@ fi
 
 # Location of Apache include files.
 INC=/usr/include/apache-1.3/  ######### CHANGEME ##########
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # INC=$APACHE/src/include
 
 if [ -f $INC/httpd.h ] 
