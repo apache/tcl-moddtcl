@@ -26,7 +26,7 @@ fi
 APACHE=$HOME/download/apache-1.3/  ######### CHANGEME ##########
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # APACHE=/usr/local/src/apache-1.3/
-APACHE=/
+# APACHE=/
 
 export APACHE
 

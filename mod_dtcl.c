@@ -443,10 +443,12 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 {
     char *errorinfo;
     char *hashKey;
-    Tcl_Obj *outbuf;
     int isNew;
-    Tcl_HashEntry *entry;
 
+    dtcl_server_conf *dsc = NULL;
+
+    Tcl_Obj *outbuf;
+    Tcl_HashEntry *entry;
     Tcl_Interp *interp = GETREQINTERP(r);
 
     /* Look for the script's compiled version. If it's not found, create it. */
@@ -456,7 +458,6 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 	/* BEGIN PARSER  */
 	char inside = 0;	/* are we inside the starting/ending delimiters  */
 	
-	dtcl_server_conf *dsc = NULL;
 	const char *strstart = STARTING_SEQUENCE;
 	const char *strend = ENDING_SEQUENCE;
 
@@ -617,6 +618,7 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 	} else if (cacheSize) { /* if it's zero, we just skip this... */
 	    Tcl_HashEntry *delEntry;
 
+	    /* a better algorithm wouldn't hurt */
 	    delEntry = Tcl_FindHashEntry(&objCache, objCacheList[cacheSize - 1]);
 	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
 	    Tcl_DeleteHashEntry(delEntry);
@@ -642,7 +644,8 @@ int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int top
 	flush_output_buffer(global_rr);
 	if (dsc->dtcl_error_script) 
 	{
-	    Tcl_EvalObj(interp, dsc->dtcl_error_script);
+	    if (Tcl_EvalObj(interp, dsc->dtcl_error_script) == TCL_ERROR) 
+		print_error(r, 1, "<b>Tcl_ErrorScript failed!</b>");
 	} else {
 	    /* default action  */
 	    errorinfo = Tcl_GetVar(interp, "errorInfo", 0);
@@ -784,14 +787,17 @@ int send_content(request_rec *r)
 	}
 	if (!upload_files_to_var)
 	{
-	    chan = Tcl_MakeFileChannel((ClientData *)fileno(upload->fp), TCL_READABLE);
-	    Tcl_RegisterChannel(interp, chan);
-	    channelname = Tcl_GetChannelName(chan);
-	    Tcl_ObjSetVar2(interp,
-			   Tcl_NewStringObj("::request::UPLOAD", -1),
-			   Tcl_NewStringObj("channelname", -1),
-			   Tcl_NewStringObj(channelname, -1), /* kill end of line */
-			   TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
+	    if (upload->fp != NULL)
+	    {
+		chan = Tcl_MakeFileChannel((ClientData *)fileno(upload->fp), TCL_READABLE);
+		Tcl_RegisterChannel(interp, chan);
+		channelname = Tcl_GetChannelName(chan);
+		Tcl_ObjSetVar2(interp,
+			       Tcl_NewStringObj("::request::UPLOAD", -1),
+			       Tcl_NewStringObj("channelname", -1),
+			       Tcl_NewStringObj(channelname, -1), /* kill end of line */
+			       TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
+	    }
 	}
 	
 	upload = upload->next;

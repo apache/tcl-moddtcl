@@ -179,6 +179,13 @@
 	  <code><b>Dtcl_Script AfterScript <i>"script"</i></b></code><br>	      
 	  Script to be called after each .ttml page.
 	</li>
+
+	<li>
+	  <code><b>Dtcl_Script ErrorScript <i>"script"</i></b></code><br>	      
+	  This code is called in place of the standard 'error' pages
+	  generated for mod_dtcl.  This directive may be useful if you
+	  have sensitive logic that you wish to protect.
+	</li>
 	
 	<li>
 	  <code><b>Dtcl_CacheSize <i>cachesize</i></b></code><br> 
@@ -295,10 +302,12 @@
 	  <code><b>$::request::UPLOAD(type)</b></code><br>
 	  The content type of the file upload. <i>Not always available!</i><br>
 
-	  <code><b>$::request::UPLOAD(channelname)</b></code><br>
-	  The name of a Tcl channel which may be used to manipulate
-	  the uploaded file.  If Dtcl_UploadFilesToVar is set, this
-	  variable doesn't get created.<br>
+	  <code><b>$::request::UPLOAD(channelname)</b></code><br> The
+	  name of a Tcl channel which may be used to manipulate the
+	  uploaded file.  If Dtcl_UploadFilesToVar is set, this
+	  variable doesn't get created.  If no file is passed to the
+	  server, this variable does not exist!  Be sure to check for
+	  this.<br>
 
 	  <code><b>$::request::UPLOAD(data)</b></code><br>
 	  Contents of the uploaded file, if Dtcl_UploadFilesToVar is
