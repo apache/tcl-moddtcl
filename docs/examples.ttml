@@ -23,7 +23,7 @@ These are some examples, rather limited ones, of what can be done with mod_dtcl.
 <tr><td bgcolor=gray><pre>
 
 &lt;+
-setcookie "foo" "bar" # we have to put this before any 'hputs' statements
+headers setcookie "foo" "bar" # we have to put this before any 'hputs' statements
 
 hputs "Hello world"
 +&gt;
@@ -233,7 +233,7 @@ There are many, many other things you can do with mod_dtcl.  You can, if everyth
 
 
 <p>
-<a href="index.html">Return to the mod_dtcl homepage</a>
+<a href="index.ttml">Return to the mod_dtcl homepage</a>
 </p>
 
 </body>

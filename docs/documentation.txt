@@ -5,25 +5,44 @@ mod_dtcl Documentation
   
     1. Check dependencies
        To install mod_dtcl, you will need Tcl 8.2 or greater and Apache
-       1.3.xx. It is known to run on Linux, FreeBSD, OpenBSD, and
-       Solaris. NT is also possible - please see the directions in the
+       1.3.xx. It is known to run on Linux, FreeBSD, OpenBSD, and Solaris
+       and HPUX. NT is also possible - please see the directions in the
        distribution.
     2. Get mod_dtcl
        If you are running a Debian or FreeBSD system, there are pre-built
        packages available at:
        [1]http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.
        html or [2]http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1.
-       Otherwise, download the sources at FIXME.
+       Otherwise, download the sources at
+       [3]http://tcl.apache.org/mod_dtcl/download/.
     3. Uncompress the sources
-       Sources should go in src/modules/mod_dtcl/, in your Apache source
-       directory.
-    4. Configure and Make
-       Run ./configure --add-module=src/modules/mod_dtcl/mod_dtcl.c from
-       the top level of your Apache source distribution. Then run make to
-       build the new Apache. This results in a static httpd with mod_dtcl
-       built in. It's also possible to build mod_dtcl as a DSO (dynamic
-       shared object) by editing mod_dtcl.c and the Makefile to point to
-       the right directories, and simply running make.
+       gunzip apache-1.3.X.tar.gz
+       tar -xvf apache-1.3.X.tar.gz
+       You don't need the Apache sources if you are building a shared
+       object module. gunzip mod_dtcl-X.X.X.tar.gz
+       tar -xvf mod_dtcl-X.X.X.tar.gz
+    4. Configure, Edit builddtcl.sh and Make
+       cd apache-1.3.X/
+       ./configure
+       cd ../mod_dtcl/
+       Now edit the builddtcl.sh script. The 3 variables you may need to
+       change are:
+          + TCLSH
+            Name of the tclsh program on your computer.
+          + APACHE
+            Location of the Apache sources (for static builds only).
+          + INC
+            Location of the Apache headers (you will need this even for
+            building shared objects).
+       ./builddtcl.sh static (shared in place of static if you are
+       building a shared object module
+       ./builddtcl.sh install (Not necessary if it is a shared object
+       build)
+       cd ../apache-1.3.X
+       ./configure --activate-module=src/modules/mod_dtcl/mod_dtcl.a [
+       other configure options ]
+       make
+       make install
     5. Configure Apache
           + http.conf
             LoadModule dtcl_module /usr/lib/apache/1.3/mod_dtcl.so
@@ -130,11 +149,9 @@ mod_dtcl Documentation
      * Binary data
        mod_dtcl is capable of outputing binary data, such as images, or
        loading binary data with 'include'.
-       
-                           [3]Powered by Apache 
 
 References
 
    1. http://www.debian.org/Packages/unstable/web/libapache-mod-dtcl.html
    2. http://www.freebsd.org/ports/www.html#mod_dtcl-0.8.1.1
-   3. http://www.apache.org/
+   3. file://localhost/home/davidw/workshop/mod_dtcl/docs/download/
