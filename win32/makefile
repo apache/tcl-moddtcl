@@ -13,12 +13,13 @@ TEMP_LIBS = C:\\TEMP
 #
 # Set this to your TCL version
 #
-TCL_VERSION = 83
+# TCL_VERSION = 83
+TCL_VERSION = 84
 
 # 
 # Set TCL_HOME to where you have installed Tcl
 #
-TCL_HOME = C:\\Progra~1\\Tcl
+TCL_HOME = C:\\"Program Files\\Tcl"
 TCL_INC = $(TCL_HOME)\\include
 TCL_LIB = $(TCL_HOME)\\lib
 
@@ -32,7 +33,7 @@ APACHE_HOME = C:\\"Program Files\\Apache Group\\Apache"
 # NOTE: You must apply the diff to the os.h file as described in the
 # readme, and this directory must contain built sources, e.g. object files
 #
-APACHE_SRC = ..\\apache
+APACHE_SRC = ..\\..\\apache
 
 #
 # Set APACHE_INC to where the APACHE source include files live. This default
@@ -53,8 +54,8 @@ APACHE_DEF = $(TEMP_LIBS)\\ApacheCore.def
 # Set APACHE_STYLE to "OLD" for versions before 1.3.17, or "NEW" for the newer
 # versions of Apache (i.e. 1.3.17 or newer).  Some file locations changed
 # between versions and this affects the build process
-APACHE_STYLE = OLD
-#APACHE_STYLE = NEW
+#APACHE_STYLE = OLD
+APACHE_STYLE = NEW
 
 
 #
@@ -138,11 +139,6 @@ apache_libs:
 	-@rm $(APACHE_DEF)
 	echo EXPORTS > $(APACHE_DEF)
 	nm $(APACHE_EXP) |grep " U _" | sed "s/.* U _//" >> $(APACHE_DEF)
-	sed -e "s/ap_log_error$$/ap_log_error@0/g" \
-		-e "s/ap_log_rerror$$/ap_log_rerror@0/g" \
-		-e "s/ap_table_do$$/ap_table_do@0/g" \
-		$(APACHE_DEF) > $(APACHE_DEF).new
-	mv $(APACHE_DEF).new $(APACHE_DEF)
 	dlltool --def $(APACHE_DEF) --dllname ApacheCore.dll \
 		--output-lib $(TEMP_LIBS)\libapachecore.a -k
 	
