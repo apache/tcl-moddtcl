@@ -121,7 +121,6 @@
 /* #define DTCL_VERSION "X.X.X" */
 
 /* *** Global variables *** */
-static Tcl_Interp *interp;              /* Tcl interpreter */
 static request_rec *global_rr;		/* request rec */
 static Tcl_Encoding system_encoding;    /* Default encoding  */
 
@@ -166,13 +165,16 @@ static char *upload_dir = "/tmp/";      /* Upload directory */
 static unsigned int upload_max = 0;              /* Maximum amount of data that may be uploaded */
 
 typedef struct {
-    Tcl_Obj *dtcl_global_init_script;
-    Tcl_Obj *dtcl_child_init_script;
+    Tcl_Interp *server_interp;          /* per server Tcl interpreter */
+    Tcl_Obj *dtcl_global_init_script;   /* run once when apache is first started */
+    Tcl_Obj *dtcl_child_init_script;     
     Tcl_Obj *dtcl_child_exit_script;
-    Tcl_Obj *dtcl_before_script;
-    Tcl_Obj *dtcl_after_script;
+    Tcl_Obj *dtcl_before_script;        /* script run before each page */
+    Tcl_Obj *dtcl_after_script;         /*            after            */
     int dtcl_cache_size;
 } dtcl_server_conf;
+
+#define GETREQINTERP(req) ((dtcl_server_conf *)ap_get_module_config(req->server->module_config, &dtcl_module))->server_interp
 
 /* Functions for Tcl Channel */
 
@@ -207,7 +209,7 @@ static char *dtcl_memcat(void *, int, void *, int);
 static char *dtcl_memdup(void *, int);
 
 static int memwrite(obuff *, char *, int);
-static int multipart(char *, request_rec *, char *, int, int);
+static int multipart(char *, request_rec *, char *,  int);
 static int parseargs(char *, request_rec *);
 static int send_content(request_rec *);
 static int send_parsed_file(request_rec *, char *, struct stat*, int);
@@ -944,7 +946,7 @@ static char *crlfsearch(char *ptr, unsigned int len)
 
 #define DTCLUPLOAD "dtclXXXXXX"
 
-static int multipart(char *inargs, request_rec *r, char *boundary, int length, int length_read)
+static int multipart(char *inargs, request_rec *r, char *boundary, int length_read)
 {
     static unsigned int buflen = 0;
     static int boundarysz = 0;
@@ -974,7 +976,10 @@ static int multipart(char *inargs, request_rec *r, char *boundary, int length, i
 
     int retval = 0;
     int linelen = 0;
-    
+ 
+    Tcl_Interp *interp;
+   
+    interp = GETREQINTERP(r);
     /* init stuff */
     if (boundarysz == 0)
 	boundarysz = strlen(boundary);
@@ -1232,6 +1237,8 @@ static int parseargs(char *inargs, request_rec *r)
 
     int i, numargs;
 
+    Tcl_Interp *interp = GETREQINTERP(r);
+
     line = ap_pstrdup(r->pool, inargs);
     for (cp = line; *cp; cp++)
 	if (*cp == '+')
@@ -1315,6 +1322,8 @@ static int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
     Tcl_HashEntry *entry;
     Tcl_Obj *cmdObjPtr;
 
+    Tcl_Interp *interp = GETREQINTERP(r);
+
     /* Look for the script's compiled version. If it's not found, create it. */
     hashKey = ap_psprintf(r->pool, "%s%ld%ld", r->filename, r->finfo.st_mtime, r->finfo.st_ctime);
     entry = Tcl_CreateHashEntry(&objCache, hashKey, &isNew);
@@ -1392,6 +1401,8 @@ static int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, 
     Tcl_Obj *outbuf;
     int isNew;
     Tcl_HashEntry *entry;
+
+    Tcl_Interp *interp = GETREQINTERP(r);
 
     /* Look for the script's compiled version. If it's not found, create it. */
     hashKey = ap_psprintf(r->pool, "%s%ld%ld%d", filename, finfo->st_mtime, finfo->st_ctime, toplevel);
@@ -1586,12 +1597,15 @@ static int send_content(request_rec *r)
     int rslt = 0;
     int errstatus;
     int content_type = 0;
-    int multipart_length = 0;
 
     char *string_content_type;
     char *boundary = NULL;
+    
+    Tcl_Interp *interp;
 
     global_rr = r;		/* Assign request to global request var */
+
+    interp = GETREQINTERP(r);
 
     r->allowed |= (1 << M_GET);
     r->allowed |= (1 << M_POST);
@@ -1648,16 +1662,13 @@ static int send_content(request_rec *r)
     if ((rslt = ap_setup_client_block(r, REQUEST_CHUNKED_ERROR)))
 	return DECLINED;
 
+    /* Check and see if it's multipart/form-data, and grab the boundary if so */
     (const char*)string_content_type = ap_table_get(r->headers_in, "Content-type");
-
     if (string_content_type != NULL)
 	if (!strncasecmp(string_content_type, "multipart/form-data", 19))
 	{	
-	    char *length;
 	    content_type = MULTIPART_FORM_DATA;
 	    boundary = strchr(string_content_type, '=') + 1;
-	    (const char*)length = ap_table_get(r->headers_in, "Content-Length");
-	    multipart_length = strtol(length, NULL, 10);
 	}
 
     /* this bit is for POST requests, more or less */
@@ -1682,7 +1693,7 @@ static int send_content(request_rec *r)
 		else
 		    argscumulative = ap_pstrdup(r->pool, argsbuffer);
 	    } else {
-		multipart(argsbuffer, r, boundary, multipart_length, len_read);
+		multipart(argsbuffer, r, boundary, len_read);
 	    }
 	}
 
@@ -1720,21 +1731,29 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
     void *sconf = s->module_config;  /* get module configuration */
-
     Tcl_Channel achan;
-
+    Tcl_Interp *interp;
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(sconf, &dtcl_module);
+    server_rec *sr;
 
     /* Initialize TCL stuff  */
 
     /* Create TCL commands to deal with Apache's BUFFs. */
 
     interp = Tcl_CreateInterp();
+    
+    /* FIXME: this bit needs to change for per-server conf things in some way */
+    sr = s;
+    while (sr)
+    {
+	dsc->server_interp = interp;
+	sr = sr->next;
+    }
+
     achan = Tcl_CreateChannel(&Achan, "apacheout", NULL, TCL_WRITABLE);
 
     system_encoding = Tcl_GetEncoding(NULL, "iso8859-1"); /* FIXME */
-
-
+    
     Tcl_SetStdChannel(achan, TCL_STDOUT);
     Tcl_SetChannelOption(interp, achan, "-buffering", "none");
 
@@ -1885,7 +1904,7 @@ static void dtcl_child_init(server_rec *s, pool *p)
 #endif
 
     if (dsc->dtcl_child_init_script != NULL)
-	if (Tcl_EvalObjEx(interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
+	if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_init_script, 0) != TCL_OK)
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
 			 "Problem running child init script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_init_script, NULL));
 }
@@ -1895,7 +1914,7 @@ static void dtcl_child_exit(server_rec *s, pool *p)
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_get_module_config(s->module_config, &dtcl_module);
 
     if (dsc->dtcl_child_exit_script != NULL)
-	if (Tcl_EvalObjEx(interp, dsc->dtcl_child_exit_script, 0) != TCL_OK)
+	if (Tcl_EvalObjEx(dsc->server_interp, dsc->dtcl_child_exit_script, 0) != TCL_OK)
 	    ap_log_error(APLOG_MARK, APLOG_ERR, s,
 			 "Problem running child exit script: %s", Tcl_GetStringFromObj(dsc->dtcl_child_exit_script, NULL));
 }
