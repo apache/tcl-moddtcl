@@ -1,0 +1,56 @@
+The provided spec file has been tested on RedHat 6 and 7 systems where
+it seems to 'do the right thing', YMMV for other RPM based systems.
+
+Building and installing the RPM should be straightforward, something
+like:
+
+  wget http://tcl.apache.org/mod_dtcl/download/mod_dtcl-0.10.0.tar.gz
+  cp mod_dtcl-0.10.0.tar.gz /usr/src/redhat/SOURCES
+  rpm -bb mod_dtcl.spec
+  rpm -ivh /usr/src/redhat/RPMS/i386/mod_dtcl-0.10.0-1.i386.rpm
+
+Once installed, Apache must be configured manually. The basic
+RedHat/Apache configuration places the mod_dtcl directives directly
+into httpd.conf. The minimum you will require are:
+
+1) Open /etc/httpd/conf/httpd.conf in your favourite text editor and
+   locate the big list of lines starting 'LoadModule'. At the end of 
+   this list, append:
+
+<IfDefine HAVE_DTCL>
+    LoadModule dtcl_module        modules/mod_dtcl.so
+</IfDefine>
+
+   The <IfDefine> stuff causes the module to be loaded if it is
+   present. This stuff is standard with RedHat 7.0, but (if I remember
+   correctly) is _not_ in earlier versions. If that's the case for
+   you, just add the 'LoadModule' line on it's own, just use what's
+   there already as an example.
+
+
+2) Head on down the file until you find the corresponding 'AddModule'
+   lines, append:
+
+<IfDefine HAVE_DTCL>
+    AddModule mod_dtcl.c
+</IfDefine>
+
+
+3) Find the 'AddType' directives and append the following:
+
+    <IfModule mod_dtcl.c>
+        AddType application/x-httpd-tcl .ttml
+    </IfModule>
+
+
+4) Save the file and restart apache:
+
+   /etc/rc.d/init.d/httpd restart
+
+
+Put the examples.ttml file in your webspace and try it out, then go
+review the documentation to see what other config options you have.
+
+Simon
+-- 
+Simon.Greaves@bigfoot.com
