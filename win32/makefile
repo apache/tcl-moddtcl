@@ -1,45 +1,48 @@
 # 
 # makefile for mod_dtcl and MingW32
 # 
+
 # 
+# Global settings
 #
+# Tweak these as needed to match your environment
+# Most of these variables can be set from the shell or command line
+# 
 
 #
 # I use this as a pointer to a good temporary location. 
 # The default works for most people
 #
-TEMP_LIBS = C:\\TEMP
+TEMP_LIBS ?= C:\\TEMP
 
 #
 # Set this to your TCL version
 #
-# TCL_VERSION = 83
-TCL_VERSION = 84
+# TCL_VERSION ?= 83
+TCL_VERSION ?= 84
 
 # 
 # Set TCL_HOME to where you have installed Tcl
 #
-TCL_HOME = C:\\"Program Files\\Tcl"
-TCL_INC = $(TCL_HOME)\\include
-TCL_LIB = $(TCL_HOME)\\lib
+TCL_HOME ?= C:\\"Program Files\\Tcl"
 
 #
 # Set this to where you have installed Apache - used for the install step.
 #
-APACHE_HOME = C:\\"Program Files\\Apache Group\\Apache"
+APACHE_HOME ?= C:\\"Program Files\\Apache Group\\Apache"
 
 #
 # Set APACHE_SRC to where your APACHE sources live.
 # NOTE: You must apply the diff to the os.h file as described in the
 # readme, and this directory must contain built sources, e.g. object files
 #
-APACHE_SRC = ..\\..\\apache
+APACHE_SRC ?= ..\\..\\apache
 
 #
 # Set APACHE_INC to where the APACHE source include files live. This default
 # should be OK.
 #
-APACHE_INC = -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
+APACHE_INC ?= -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
 
 
 #
@@ -47,21 +50,15 @@ APACHE_INC = -I $(APACHE_SRC)\\src\\include -I $(APACHE_SRC)\\src\\os\\win32
 # APACHE library file and DLL DEF file put.  You normally only need these
 # during a build, so a temporary location is OK
 #
-APACHE_LIB = $(TEMP_LIBS) 
-APACHE_DEF = $(TEMP_LIBS)\\ApacheCore.def
-
-# 
-# Set APACHE_STYLE to "OLD" for versions before 1.3.17, or "NEW" for the newer
-# versions of Apache (i.e. 1.3.17 or newer).  Some file locations changed
-# between versions and this affects the build process
-#APACHE_STYLE = OLD
-APACHE_STYLE = NEW
-
+APACHE_LIB ?= $(TEMP_LIBS) 
+APACHE_DEF ?= $(TEMP_LIBS)\\ApacheCore.def
 
 #
 # You shouldn't have to change anything below this
 #
 ROOT_DIR = ..\\
+TCL_INC = $(TCL_HOME)\\include
+TCL_LIB = $(TCL_HOME)\\lib
 
 CC = gcc -O3 -fnative-struct -shared -mwindows -DSHARED_MODULE -DDTCL_VERSION="\"`cat $(ROOT_DIR)\\VERSION`\""
 
@@ -83,21 +80,17 @@ DLLWRAP_FLAGS = --def $(DLL_EXP_DEF) \
 	--implib $(DLL_EXP_LIB) \
 	--driver-name $(CC)
 
-ifeq ($(APACHE_STYLE),OLD)
- DLL_BUILD=$(DLL_DYNAMIC)
- APACHE_EXP=$(APACHE_SRC)\\src\\CoreR\\ApacheCore.exp
-else
- DLL_BUILD=$(DLL_SO)
- APACHE_EXP=$(APACHE_SRC)\\src\\Release\\ApacheCore.exp
-endif
-
 #
-# By default we build a .dll file (Apache < 1.3.14)
+# By default we build a .so file (Apache > 1.3.14)
 #
-all : apache_libs $(DLL_BUILD)
+all : so_style 
 
-dll_style: apache_libs $(DLL_DYNAMIC)
+dll_style:	APACHE_EXP=$(APACHE_SRC)\\CoreR\\ApacheCore.exp 
+dll_style:	DLL_BUILD=$(DLL_DYNAMIC)
+dll_style:	apache_libs $(DLL_DYNAMIC)
 
+so_style:	APACHE_EXP=$(APACHE_SRC)\\src\\Release\\ApacheCore.exp
+so_style:	DLL_BUILD=$(DLL_SO)	
 so_style:	apache_libs $(DLL_SO)
 
 $(DLL_DYNAMIC):	$(DLL_OBJS) makefile
