@@ -467,8 +467,7 @@ static int send_content(request_rec *r)
     {
 	set_header_type(r, DEFAULT_HEADER_TYPE);
 	print_headers(r);
-
-	return OK;
+	goto cleanup;
     }
 
     ap_cpystrn(error, DEFAULT_ERROR_MSG, sizeof(error));
@@ -589,6 +588,7 @@ static int send_content(request_rec *r)
 
     get_parse_exec_file(r, dsc, r->filename, 1);
     /* reset globals  */
+cleanup:
     *(dsc->buffer_output) = 0;
     *(dsc->headers_printed) = 0;
     *(dsc->headers_set) = 0;
