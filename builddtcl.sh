@@ -65,6 +65,7 @@ export TCL_EXTRA_CFLAGS
 export TCL_LIBS
 export TCL_LIB_FLAG 
 export TCL_LIB_SPEC
+export TCL_PREFIX
 export TCL_SHLIB_CFLAGS
 export TCL_SHLIB_LD
 export TCL_SHLIB_SUFFIX

@@ -8,7 +8,7 @@
 # You must change the following line unless you have the Debian
 # apache-dev package
 
-INC=$(INCLUDES) -I$(TCL_SRC_DIR)
+INC=$(INCLUDES) -idirafter $(TCL_PREFIX)/include
 
 STATICLIB=mod_dtcl.a
 SHLIB=mod_dtcl$(TCL_SHLIB_SUFFIX)
