@@ -746,14 +746,14 @@ int send_content(request_rec *r)
                    produce a variable that is a list */
 		Tcl_Obj *newkey = STRING_TO_UTF_TO_OBJ(parms[i].key);
 		Tcl_Obj *newval = STRING_TO_UTF_TO_OBJ(parms[i].val);
-		Tcl_Obj *oldkey = Tcl_ObjGetVar2(interp, varsobj, newkey, 0);
+		Tcl_Obj *oldval = Tcl_ObjGetVar2(interp, varsobj, newkey, 0);
 		
-		if (oldkey == NULL)
+		if (oldval == NULL)
 		{
 		    Tcl_ObjSetVar2(interp, varsobj, newkey, newval, 0);
 		} else {
 		    Tcl_Obj *concat[2];
-		    concat[0] = oldkey;
+		    concat[0] = oldval;
 		    concat[1] = newval;
 		    Tcl_ObjSetVar2(interp, varsobj, newkey, Tcl_ConcatObj(2, concat), 0);
 		}
