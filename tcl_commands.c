@@ -84,6 +84,9 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     }
 /*     print_headers(globals->r);
        flush_output_buffer(globals->r);  */
+
+    /* Use Tcl_Read because we don't want to fool with UTF - just read
+       it in and dump it out. */
     while ((sz = Tcl_Read(fd, buf, BUFSZ - 1)))
     {
 	if (sz == -1)
@@ -115,7 +118,8 @@ int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CON
     int len;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
-  
+    Tcl_DString outstring;
+
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "string");
@@ -123,8 +127,10 @@ int Buffer_Add(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CON
     }
     arg1 = Tcl_GetByteArrayFromObj(objv[1], &len);
 
-    memwrite(dsc->obuffer, arg1, len);
+    Tcl_UtfToExternalDString(NULL, arg1, len, &outstring);
+    memwrite(dsc->obuffer, Tcl_DStringValue(&outstring), Tcl_DStringLength(&outstring));
     *(dsc->content_sent) = 0;
+    Tcl_DStringFree(&outstring);
     return TCL_OK;
 }
 
@@ -135,7 +141,7 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     char *arg1;
     int length;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module); 
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2)
     {
@@ -156,11 +162,16 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 		     globals->r->server, "Mod_Dtcl Error: %s",
 		     Tcl_GetStringFromObj (objv[2], (int *)NULL));
     } else {
+	Tcl_DString outstring;
 	if (objc != 2)
 	{
 	    Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
 	    return TCL_ERROR;
 	}
+	/* transform it from UTF to External representation */
+	Tcl_UtfToExternalDString(NULL, arg1, length, &outstring);
+	arg1 = Tcl_DStringValue(&outstring);
+	length = Tcl_DStringLength(&outstring);
 	if (*(dsc->buffer_output) == 1)
 	{
 	    memwrite(dsc->obuffer, arg1, length);
@@ -169,6 +180,7 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	    flush_output_buffer(globals->r);
 	    ap_rwrite(arg1, length, globals->r);
 	}
+	Tcl_DStringFree(&outstring);
     }
 
     return TCL_OK;
@@ -278,9 +290,9 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
 int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-    char *opt = NULL; 
+    char *opt = NULL;
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
-    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module); 
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc != 2)
     {
@@ -662,7 +674,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	return TCL_ERROR;
     }
     command = Tcl_GetString(objv[1]);
-    
+
     result = Tcl_NewObj();
     if (!strcmp(command, "get"))
     {
@@ -795,7 +807,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	upload = ApacheRequest_upload(globals->req);
 	while (upload)
 	{
-	    Tcl_ListObjAppendElement(interp, result, 
+	    Tcl_ListObjAppendElement(interp, result,
 				     STRING_TO_UTF_TO_OBJ(upload->name, POOL));
 	    upload = upload->next;
 	}
@@ -836,7 +848,7 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 
 int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-    
+
     dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 

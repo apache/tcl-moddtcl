@@ -25,7 +25,7 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
     int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
     int inside = 0;
     Tcl_DString dstr;
-/*     Tcl_DString convdstr;  */
+    Tcl_DString convdstr;
 
     Tcl_DStringInit(&dstr);
 
@@ -132,14 +132,14 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 	}
     }
 
-/*     Tcl_ExternalToUtfDString(NULL, 
+    Tcl_ExternalToUtfDString(NULL,
 			     Tcl_DStringValue(&dstr),
 			     Tcl_DStringLength(&dstr),
-			     &convdstr);  */
-    
-    Tcl_AppendToObj(outbuf, Tcl_DStringValue(&dstr),
-		    Tcl_DStringLength(&dstr));
+			     &convdstr);
+
+    Tcl_AppendToObj(outbuf, Tcl_DStringValue(&convdstr),
+		    Tcl_DStringLength(&convdstr));
     Tcl_DStringFree(&dstr);
-/*     Tcl_DStringFree(&convdstr);  */
+    Tcl_DStringFree(&convdstr);
     return inside;
 }

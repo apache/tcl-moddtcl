@@ -91,6 +91,9 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
 static int send_content(request_rec *);
 static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
 
+/* just need some arbitrary non-NULL pointer which can't also be a request_rec */
+#define NESTED_INCLUDE_MAGIC	(&dtcl_module)
+
 /* Functions for Tcl Channel */
 
 static int closeproc(ClientData, Tcl_Interp *);
@@ -117,9 +120,6 @@ static Tcl_ChannelType Achan = {
     NULL
 };
 
-/* just need some arbitrary non-NULL pointer which can't also be a request_rec */
-#define NESTED_INCLUDE_MAGIC	(&dtcl_module)
-
 static int inputproc(ClientData instancedata, char *buf, int toRead, int *errorCodePtr)
 {
     return EINVAL;
@@ -130,8 +130,14 @@ static int inputproc(ClientData instancedata, char *buf, int toRead, int *errorC
 
 static int outputproc(ClientData instancedata, char *buf, int toWrite, int *errorCodePtr)
 {
+    Tcl_DString outstring;
     dtcl_server_conf *dsc = (dtcl_server_conf *)instancedata;
-    memwrite(dsc->obuffer, buf, toWrite);
+    /* we will have to deal with this when we switch over to using the
+       channel directly */
+    Tcl_UtfToExternalDString(NULL, buf, toWrite, &outstring);
+    memwrite(dsc->obuffer, Tcl_DStringValue(&outstring),
+	     Tcl_DStringLength(&outstring));
+    Tcl_DStringFree(&outstring);
     return toWrite;
 }
 
@@ -168,6 +174,9 @@ static int gethandleproc(ClientData instancedata, int direction, ClientData *han
 }
 
 /* Write something to the output buffer structure */
+
+/* In the future, we ought to replace calls to this with
+   Tcl_WriteChars or something else that uses the channel directly. */
 
 int memwrite(obuff *buffer, char *input, int len)
 {
@@ -268,7 +277,6 @@ int flush_output_buffer(request_rec *r)
 
 char *StringToUtf(char *input, ap_pool *pool)
 {
-#if DTCL_I18N == 1
     char *temp;
     Tcl_DString dstr;
     Tcl_DStringInit(&dstr);
@@ -277,10 +285,6 @@ char *StringToUtf(char *input, ap_pool *pool)
     temp = ap_pstrdup(pool, Tcl_DStringValue(&dstr));
     Tcl_DStringFree(&dstr);
     return temp;
-#else
-    /* If we aren't using the i18n stuff, no need to do anything */
-    return input;
-#endif
 }
 
 /* Function to be used should we desire to upload files to a variable */
@@ -370,7 +374,7 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
 	Tcl_SetStringObj(outbuf, "namespace eval request {\n", -1);
 	if (dsc->dtcl_before_script) {
 	    Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
-	} 
+	}
 	Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
     }
     else
@@ -406,11 +410,6 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
     }
     else
 	Tcl_AppendToObj(outbuf, "\n", -1);
-
-#if DTCL_I18N == 1
-    /* Convert to encoding  */
-    Tcl_SetStringObj(outbuf, StringToUtf(Tcl_GetString(outbuf), r->pool), -1);
-#endif
 
     /* END PARSER  */
     return TCL_OK;
@@ -518,7 +517,7 @@ static int send_content(request_rec *r)
     int errstatus;
 
     Tcl_Interp *interp;
-    
+
     dtcl_interp_globals *globals = NULL;
     dtcl_server_conf *dsc = NULL;
     dsc = dtcl_get_conf(r);
@@ -781,7 +780,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
            hosts */
 	if (sr != s) /* not the first one  */
 	{
-	    mydsc = ap_pcalloc(p, sizeof(dtcl_server_conf));	    
+	    mydsc = ap_pcalloc(p, sizeof(dtcl_server_conf));
 	    ap_set_module_config(sr->module_config, &dtcl_module, mydsc);
 	    copy_dtcl_config(p, dsc, mydsc);
 	    if (dsc->seperate_virtual_interps != 0)
@@ -896,7 +895,7 @@ static const char *set_seperatevirtinterps(cmd_parms *cmd, void *dummy, char *ar
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
     if (!strcmp(arg, "on"))
 	dsc->seperate_virtual_interps = 1;
-    else 
+    else
 	dsc->seperate_virtual_interps = 0;
     return NULL;
 }
@@ -911,7 +910,7 @@ dtcl_server_conf *dtcl_get_conf(request_rec *r)
     dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
     if (dconf != NULL)
     {
-	dtcl_server_conf *ddc = (dtcl_server_conf *) 
+	dtcl_server_conf *ddc = (dtcl_server_conf *)
 	    ap_get_module_config(dconf, &dtcl_module); /* per directory config */
 
 	newconfig = (dtcl_server_conf *) ap_pcalloc(r->pool, sizeof(dtcl_server_conf));

@@ -24,11 +24,6 @@
    troublemakers.  */
 #define HIDE_DTCL_VERSION 1
 
-/* Turn on the translation stuff.  This will translate things to UTF
-   correctly.  Turn off *only* if you will *not* use anything but
-   plain ascii */
-#define DTCL_I18N 1
-
 /* Allow <+ +> tags for backwards compatibility.  Use the
    mod_dtcl/contrib/newtags.sh script to update your .ttml files to
    use <? ?> tags. */
