@@ -117,6 +117,7 @@
 #define DEFAULT_ERROR_MSG "[an error occurred while processing this directive]"
 #define DEFAULT_TIME_FORMAT "%A, %d-%b-%Y %H:%M:%S %Z"
 #define DEFAULT_HEADER_TYPE "text/html"
+#define MULTIPART_FORM_DATA 1
 /* #define DTCL_VERSION "X.X.X" */
 
 /* *** Global variables *** */
@@ -156,6 +157,13 @@ static int cacheSize = 0;               /* size of cache, determined
                                            / 2"; in the
                                            dtcl_init_handler function */
 static int cacheFreeSize = 0;           /* free space in cache */
+
+static int upload_files_to_var = 0;     /* Upload files directly into
+                                           Tcl variables, possibly
+                                           using a lot of memory */
+
+static char *upload_dir = "/tmp/";      /* Upload directory */
+static unsigned int upload_max = 0;              /* Maximum amount of data that may be uploaded */
 
 typedef struct {
     Tcl_Obj *dtcl_global_init_script;
@@ -200,6 +208,7 @@ static Tcl_ChannelType Achan = {
 #define NESTED_INCLUDE_MAGIC	(&dtcl_module)
 
 static int memwrite(obuff *, char *, int);
+static int multipart(char *, request_rec *, char *, int, int);
 static int parseargs(char *, request_rec *);
 static int send_content(request_rec *);
 static int send_parsed_file(request_rec *, char *, struct stat*, int);
@@ -248,6 +257,37 @@ void  watchproc(ClientData instancedata, int mask)
     return;
 }
 */
+
+/* concatenate two memory regions  */
+
+static char *dtcl_memcat(void *chunk1, int len1, void *chunk2, int len2)
+{
+    int sz = len1 + len2;
+    chunk1 = realloc((char *)chunk1, sz * sizeof(char));    
+    if (chunk1 == NULL)
+    {
+	fprintf(stderr, "ap_palloc barfed in memcat, len = %d!\n", sz);
+	return NULL;
+    }
+    memset(chunk1 + len1, '\0', len2);
+    memcpy(chunk1+len1, chunk2, len2);
+    return chunk1;
+}
+
+/* "memdup" */
+
+static char *dtcl_memdup(void *chunk, int len)
+{
+    char *buf = malloc(len * sizeof(char));
+    if (buf == NULL)
+    {
+	fprintf(stderr, "ap_palloc barfed in memdup, len = %d!\n", len);
+	return NULL;
+    }
+    memset(buf, '\0', len);
+    memcpy(buf, chunk, len);
+    return buf;
+}
 
 /* Write something to the output buffer structure */
 
@@ -456,6 +496,8 @@ static char *StringToUtf(char *input)
     return input;
 #endif
 }
+/* Macro to Tcl Objectify StringToUtf stuff */
+#define STRING_TO_UTF_TO_OBJ(string) Tcl_NewStringObj(StringToUtf(string), -1)
 
 /* Include and parse a file */
 
@@ -752,6 +794,8 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     array_header *env_arr;
     table_entry  *env;
 
+    Tcl_Obj *EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
+
     /* ensure that the system area which holds the cgi variables is empty */
     ap_clear_table(global_rr->subprocess_env);
 
@@ -766,31 +810,31 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     env     = (table_entry *) env_arr->elts;
 
     /* These were the "include vars"  */
-    Tcl_SetVar2(interp, "::request::ENVS", "DATE_LOCAL", StringToUtf(ap_ht_time(global_rr->pool, date, timefmt, 0)), 0);
-    Tcl_SetVar2(interp, "::request::ENVS", "DATE_GMT", StringToUtf(ap_ht_time(global_rr->pool, date, timefmt, 1)), 0);
-    Tcl_SetVar2(interp, "::request::ENVS", "LAST_MODIFIED", StringToUtf(ap_ht_time(global_rr->pool, global_rr->finfo.st_mtime, timefmt, 0)), 0);
-    Tcl_SetVar2(interp, "::request::ENVS", "DOCUMENT_URI", StringToUtf(global_rr->uri), 0);
-    Tcl_SetVar2(interp, "::request::ENVS", "DOCUMENT_PATH_INFO", StringToUtf(global_rr->path_info), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 0)), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_GMT", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 1)), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("LAST_MODIFIED", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, global_rr->finfo.st_mtime, timefmt, 0)), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_URI", -1), STRING_TO_UTF_TO_OBJ(global_rr->uri), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_PATH_INFO", -1), STRING_TO_UTF_TO_OBJ(global_rr->path_info), 0);
 
 #ifndef WIN32
     pw = getpwuid(global_rr->finfo.st_uid);
     if (pw)
-	Tcl_SetVar2(interp, "::request::ENVS", "USER_NAME", StringToUtf(ap_pstrdup(global_rr->pool, pw->pw_name)), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1), STRING_TO_UTF_TO_OBJ(ap_pstrdup(global_rr->pool, pw->pw_name)), 0);
     else
-	Tcl_SetVar2(interp, "::request::ENVS", "USER_NAME",
-		    StringToUtf(ap_psprintf(global_rr->pool, "user#%lu", (unsigned long) global_rr->finfo.st_uid)), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1),
+		    STRING_TO_UTF_TO_OBJ(ap_psprintf(global_rr->pool, "user#%lu", (unsigned long) global_rr->finfo.st_uid)), 0);
 #endif
 
     if ((t = strrchr(global_rr->filename, '/')))
-	Tcl_SetVar2(interp, "::request::ENVS", "DOCUMENT_NAME", StringToUtf(++t), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(++t), 0);
     else
-	Tcl_SetVar2(interp, "::request::ENVS", "DOCUMENT_NAME", StringToUtf(global_rr->uri), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(global_rr->uri), 0);
 
     if (global_rr->args)
     {
 	char *arg_copy = ap_pstrdup(global_rr->pool, global_rr->args);
 	ap_unescape_url(arg_copy);
-	Tcl_SetVar2(interp, "::request::ENVS", "QUERY_STRING_UNESCAPED", StringToUtf(ap_escape_shell_cmd(global_rr->pool, arg_copy)), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("QUERY_STRING_UNESCAPED", -1), STRING_TO_UTF_TO_OBJ(ap_escape_shell_cmd(global_rr->pool, arg_copy)), 0);
     }
 
     /* ----------------------------  */
@@ -833,7 +877,7 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
 		var = var2;
 	    }
 	} else {
-	    Tcl_SetVar2(interp, "::request::ENVS", StringToUtf(hdrs[i].key), StringToUtf(hdrs[i].val), 0);
+	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key), STRING_TO_UTF_TO_OBJ(hdrs[i].val), 0);
 	}
     }
 
@@ -842,7 +886,7 @@ static int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj
     {
 	if (!env[i].key)
 	    continue;
-	Tcl_SetVar2(interp, "::request::ENVS", StringToUtf(env[i].key), StringToUtf(env[i].val), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(env[i].key), STRING_TO_UTF_TO_OBJ(env[i].val), 0);
     }
 
     /* cleanup system cgi variables */
@@ -871,7 +915,293 @@ static int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Ob
     return TCL_OK;
 }
 
-/* This function does the GET variables passed to us  */
+// if ((end + 2 != NULL) && !strncmp(end + 2, "--", 2))
+
+    /* search buffer for \r\n, set end to location */
+#define CRLFSEARCH() \
+    for (i = 0; i < buflen - 1; i ++) {\
+	if (baseptr[i] == '\r') {\
+	    if (baseptr[i+1] == '\n') {\
+		end = &baseptr[i];\
+                break;\
+	    }\
+	}\
+    }
+
+/* For multipart/form-data */
+#define CONTENT_DISP "Content-Disposition: form-data;"
+#define CONTENT_DISP_LEN strlen(CONTENT_DISP)
+#define CONTENT_TYPE "Content-type: "
+#define CONTENT_TYPE_LEN strlen(CONTENT_TYPE)
+
+#define DTCLUPLOAD "dtclXXXXXX"
+
+static int multipart(char *inargs, request_rec *r, char *boundary, int length, int length_read)
+{
+    static int buflen = 0;
+    static int boundarysz = 0;
+    static int state = 0;     /*  
+				  0: normal
+				  1: variable
+				  2: file
+			      */
+
+    static char *buffer = NULL;
+
+    static char *varname = NULL;
+
+    static char *acum = NULL;
+    static int acumlen = 0;
+
+    static Tcl_Obj *val;
+    static int tmpfilefd = 0;
+    static char *tmpfilename = NULL;
+
+    char *baseptr = NULL;
+    char *line = NULL;
+    char *end = NULL;
+    char *errstr = NULL;
+
+    int retval = 0;
+    int linelen = 0;
+    
+    register unsigned int i = 0;
+
+    /* init stuff */
+    if (boundarysz == 0)
+	boundarysz = strlen(boundary);
+
+    if (tmpfilefd == 0 && !upload_files_to_var)
+    {
+	tmpfilename = ap_pstrcat(r->pool, upload_dir, DTCLUPLOAD, NULL);
+	tmpfilefd = mkstemp(tmpfilename);
+    }
+    /* ---------- */
+
+    if (buffer != NULL)
+    {
+	buffer = dtcl_memcat(buffer, buflen, inargs, length_read);
+	baseptr = buffer;
+	buflen = buflen + length_read;
+    } else {
+	buffer = dtcl_memdup(inargs, length_read);
+	baseptr = buffer;
+	buflen = length_read;
+    }
+
+    /* search base for \r\n, set end to location */
+    CRLFSEARCH();
+
+    while (end)
+    {
+	line = baseptr;
+	linelen = end - baseptr;
+ 	baseptr = end + 2;
+	buflen -= baseptr - line;
+
+	/* boundary is preceded by "--" */
+	if (!strncmp (line, "--", 2) && !strncmp(line + 2, boundary, boundarysz)) 
+	{
+	    *end = '\0';
+	    if (state == 1) { /* it's a variable  */
+		/* don't do much...  */
+	    } else if (state == 2) { /* it's a file  */	
+		/* send to file, or stick in variable */
+		if (upload_files_to_var != 0)
+		{
+		    fprintf(stderr, "data dumped to var\n");
+		    Tcl_ObjSetVar2(interp, 
+				   Tcl_NewStringObj("::request::UPLOAD", -1), 
+				   Tcl_NewStringObj("data", -1), 
+				   Tcl_NewByteArrayObj(acum, acumlen), 
+				   0);
+		    free(acum);
+		    acum = NULL;
+		    acumlen = 0;
+		} else {
+		    Tcl_ObjSetVar2(interp, 
+				   Tcl_NewStringObj("::request::UPLOAD", -1), 
+				   Tcl_NewStringObj("realname", -1), 
+				   Tcl_NewStringObj(tmpfilename, -1),
+				   0);
+
+		    close(tmpfilefd);
+		    /* close FD */
+		}
+	    }
+	    varname = NULL;
+	    val = NULL;
+	    state = 0;
+	    /* check to see if the boundary is followed by "--" */
+	    if ((line + boundarysz + 2) != NULL &&
+		*(line + boundarysz + 2) == '-' &&
+		(line + boundarysz + 3) != NULL &&
+		*(line + boundarysz + 3) == '-')
+		goto cleanup;
+	    
+	} else if (!strncmp(line, CONTENT_DISP, CONTENT_DISP_LEN)) {
+	    /* Parse stuff like this: name="foobar"; filename="blah.txt" */
+	    char *vars; 
+	    char *base;
+	    int varlen;
+	    int linestate = 0; /* 1 = inside quotes */
+	    *end = '\0';
+	    vars = line + CONTENT_DISP_LEN + 1;
+	    base = vars;
+	    varlen = strlen(vars);
+		
+	    while (varlen)
+	    {
+		if (*vars == '=') {
+		    *vars = '\0';
+		    if (!strcmp(base, "filename"))
+			state = 2;
+		    else if (!strcmp(base, "name"))
+			state = 1;
+		    else
+		    {
+			errstr = "Problems with multipart form data (file upload), state = %d";
+			goto multi_error;
+		    }
+		    vars ++;
+		    base = vars;
+		} else if (*vars == '"') {
+		    if (linestate == 1)
+		    {
+			*vars = '\0';
+			if (state == 1) /* it's a variable name */
+			    varname = ap_pstrdup(r->pool, base);
+			else /* it's a filename */
+			{
+			    Tcl_ObjSetVar2(interp, 
+					   Tcl_NewStringObj("::request::UPLOAD", -1), 
+					   Tcl_NewStringObj("filename", -1), 
+					   Tcl_NewStringObj(base, -1), 
+					   0);
+			}
+			
+			linestate = 0;
+		    } else {
+			linestate = 1;
+		    }
+		    vars ++;
+		    base = vars;
+		} else if (*vars == ';') {
+		    vars ++;
+		    base = vars;
+		} else if (*vars == ' ') {
+		    if (linestate == 0) 
+			base ++;
+		    vars ++;
+		} else {
+		    vars ++;
+		}
+		varlen --;
+	    }
+	} else if (!strncasecmp(line, CONTENT_TYPE, CONTENT_TYPE_LEN)) {
+	    /* do something with content type */
+	    *end = '\0';
+	    line += CONTENT_TYPE_LEN;
+	    Tcl_ObjSetVar2(interp, 
+			   Tcl_NewStringObj("::request::UPLOAD", -1),
+			   Tcl_NewStringObj("type", -1),
+			   Tcl_NewStringObj(line, strlen(line)), /* kill end of line */
+			   0);
+	} else { /* ordinary line */
+
+	    if (state == 0) {
+		/* don't do much */
+	    } else if (state == 1) { /* it's a variable */
+		if (linelen > 0) /* make sure it's not blank */
+		{
+		    *end = '\0';
+		    Tcl_ObjSetVar2(interp,
+				   Tcl_NewStringObj("::request::VARS", -1),
+				   Tcl_NewStringObj(varname, -1),
+				   Tcl_NewStringObj(line, -1), 0);
+		}
+	    } else if (state == 2) {
+		int sz = end - line;
+		if (sz > 0)
+		{
+		    if (end + 4 + boundarysz != NULL) /* make sure not to overrun */
+			if (strncmp (end+2, "--", 2) && strncmp(end + 4, boundary, boundarysz))
+			    sz += 2; /* reset stuff if we get \r\n in the middle of a file upload */
+
+		    if (upload_files_to_var != 0)
+		    {
+			if (acumlen == 0)
+			    acum = dtcl_memdup(line, sz);
+			else 
+			    acum = dtcl_memcat(acum, acumlen, line, sz);
+			
+			acumlen += sz;
+		    } else {
+			write(tmpfilefd, line, sz);
+		    }
+		}
+	    } 
+	}
+
+	end = NULL;
+	CRLFSEARCH();
+    }
+
+    if (buflen && state == 2)
+    {
+	if (!upload_files_to_var)
+	{
+	    write(tmpfilefd, baseptr, buflen);
+	} else {
+	    if (acumlen == 0)
+		acum = dtcl_memdup(baseptr, buflen);
+	    else 
+		acum = dtcl_memcat(acum, acumlen, baseptr, buflen);
+	    
+	    acumlen += buflen;
+	    fprintf(stderr, "acumlen: %d\n", acumlen);
+	}
+	buflen = 0;
+	free(buffer);
+	buffer = NULL;
+	baseptr = NULL;
+    }
+    
+    return 0;
+
+    /* Because it's convenient. */   
+multi_error:
+    retval = -1;
+    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
+		 errstr, state);
+    
+cleanup:
+    /* return things to normal */
+    buflen = 0;
+    boundarysz = 0;
+    if (buffer != NULL)
+    {
+	free(buffer);
+	buffer = NULL;
+	baseptr = NULL;
+    }
+    if (acum != NULL)
+    {
+	free(acum);
+	acum = NULL;
+    }
+    acumlen = 0;
+    varname = NULL;
+    val = NULL;
+    state = 0;
+    if (!upload_files_to_var && tmpfilefd)
+	close(tmpfilefd);
+    tmpfilefd = 0;
+    tmpfilename = ap_pstrcat(r->pool, upload_dir, DTCLUPLOAD, NULL);
+    return retval;
+}
+
+/* This function does the GET/POST variables passed to us  */
 static int parseargs(char *inargs, request_rec *r)
 {
     char *line, *cp, *var = NULL, *val = NULL, *linept;
@@ -924,8 +1254,8 @@ static int parseargs(char *inargs, request_rec *r)
 	*/
 	{
 	    Tcl_Obj *vars = Tcl_NewStringObj("::request::VARS", -1);
-	    Tcl_Obj *newval = Tcl_NewStringObj(StringToUtf(cgiDecodeString(val)), -1);
-	    Tcl_Obj *newvar = Tcl_NewStringObj(StringToUtf(cgiDecodeString(var)), -1);
+	    Tcl_Obj *newval = STRING_TO_UTF_TO_OBJ(cgiDecodeString(val));
+	    Tcl_Obj *newvar = STRING_TO_UTF_TO_OBJ(cgiDecodeString(var));
 	    Tcl_Obj *oldvar = Tcl_ObjGetVar2(interp, vars, newvar, 0);
 
 	    if (oldvar == NULL)
@@ -1231,6 +1561,11 @@ static int send_content(request_rec *r)
 
     int rslt = 0;
     int errstatus;
+    int content_type = 0;
+    int multipart_length = 0;
+
+    char *string_content_type;
+    char *boundary = NULL;
 
     global_rr = r;		/* Assign request to global request var */
 
@@ -1289,6 +1624,18 @@ static int send_content(request_rec *r)
     if ((rslt = ap_setup_client_block(r, REQUEST_CHUNKED_ERROR)))
 	return DECLINED;
 
+    (const char*)string_content_type = ap_table_get(r->headers_in, "Content-type");
+
+    if (string_content_type != NULL)
+	if (!strncmp(string_content_type, "multipart/form-data", 19))
+	{	
+	    char *length;
+	    content_type = MULTIPART_FORM_DATA;
+	    boundary = strchr(string_content_type, '=') + 1;
+	    (const char*)length = ap_table_get(r->headers_in, "Content-Length");
+	    multipart_length = strtol(length, NULL, 10);
+	}
+
     /* this bit is for POST requests, more or less */
     /* I took it from mod_cgi and modified it to suit my needs */
     if (ap_should_client_block(r))
@@ -1304,13 +1651,20 @@ static int send_content(request_rec *r)
 	    argsbuffer[len_read] = '\0';
 	    ap_reset_timeout(r);
 
-	    if (argscumulative != NULL)
-		argscumulative = ap_pstrcat(r->pool, argscumulative, argsbuffer, NULL);
-	    else
-		argscumulative = ap_pstrdup(r->pool, argsbuffer);
+	    if (content_type != MULTIPART_FORM_DATA) 
+	    {
+		if (argscumulative != NULL)
+		    argscumulative = ap_pstrcat(r->pool, argscumulative, argsbuffer, NULL);
+		else
+		    argscumulative = ap_pstrdup(r->pool, argsbuffer);
+	    } else {
+		multipart(argsbuffer, r, boundary, multipart_length, len_read);
+	    }
 	}
 
-	rslt = parseargs(argscumulative, r);
+ 	if (content_type != MULTIPART_FORM_DATA)
+	    rslt = parseargs(argscumulative, r);
+
 	if (rslt)
 	{
 	    print_error(r, 0, argscumulative);
@@ -1464,6 +1818,22 @@ static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
     return NULL;
 }
 
+static const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
+{
+    upload_dir = arg;
+    return NULL;
+}
+static const char *set_uploadmax(cmd_parms *cmd, void *dummy, char *arg)
+{
+    upload_max = strtol(arg, NULL, 10);
+    return NULL;
+}
+static const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
+{
+    upload_files_to_var = strtol(arg, NULL, 10);
+    return NULL;
+}
+
 static void *create_dtcl_config(pool *p, server_rec *s)
 {
     dtcl_server_conf *dts = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
@@ -1472,6 +1842,7 @@ static void *create_dtcl_config(pool *p, server_rec *s)
     dts->dtcl_child_exit_script = NULL;
     dts->dtcl_before_script = NULL;
     dts->dtcl_after_script = NULL;
+    dts->dtcl_cache_size = 0;
     return dts;
 }
 
@@ -1516,6 +1887,9 @@ static const command_rec dtcl_cmds[] =
 {
     {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript scriptname.tcl"},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
+    {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
+    {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},
+    {"Dtcl_UploadFilesToVar", set_filestovar, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadFilesToVar 1/0"},
     {NULL}
 };
 
@@ -1544,6 +1918,6 @@ module MODULE_VAR_EXPORT dtcl_module =
 
 /*
 Local Variables: ***
-compile-command: "./builddtcl.sh" ***
+compile-command: "./builddtcl.sh shared" ***
 End: ***
 */
