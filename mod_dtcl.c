@@ -569,9 +569,16 @@ static int send_content(request_rec *r)
 	}
 	if (!upload_files_to_var)
 	{
-	    if (upload->fp != NULL)
+	    if (ApacheUpload_FILE(upload) != NULL)
 	    {
-		chan = Tcl_MakeFileChannel((ClientData)fileno(upload->fp), TCL_READABLE);
+#ifdef __MINGW32__
+		chan = Tcl_MakeFileChannel(
+		    (ClientData)_get_osfhandle(
+			fileno(ApacheUpload_FILE(upload))), TCL_READABLE);
+#else
+		chan = Tcl_MakeFileChannel(
+		    (ClientData)fileno(ApacheUpload_FILE(upload)), TCL_READABLE);
+#endif
 		Tcl_RegisterChannel(interp, chan);
 		channelname = Tcl_GetChannelName(chan);
 		Tcl_ObjSetVar2(interp,

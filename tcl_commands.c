@@ -743,8 +743,14 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		{
 		    /* create and return a file channel */
 		    char *channelname = NULL;
-		    chan = Tcl_MakeFileChannel((ClientData)fileno(
-			ApacheUpload_FILE(upload)), TCL_READABLE);
+#ifdef __MINGW32__
+		    chan = Tcl_MakeFileChannel(
+			(ClientData)_get_osfhandle(
+			    fileno(ApacheUpload_FILE(upload))), TCL_READABLE);
+#else
+		    chan = Tcl_MakeFileChannel(
+			(ClientData)fileno(ApacheUpload_FILE(upload)), TCL_READABLE);
+#endif
 		    Tcl_RegisterChannel(interp, chan);
 		    channelname = (char *)Tcl_GetChannelName(chan);
 		    Tcl_SetStringObj(result, channelname, -1);
@@ -768,8 +774,14 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		else
 		    Tcl_SetChannelOption(interp, savechan, "-translation", "binary");
 
-		chan = Tcl_MakeFileChannel((ClientData)fileno(
-		    ApacheUpload_FILE(upload)), TCL_READABLE);
+#ifdef __MINGW32__
+		chan = Tcl_MakeFileChannel(
+		    (ClientData)_get_osfhandle(
+			fileno(ApacheUpload_FILE(upload))), TCL_READABLE);
+#else
+		chan = Tcl_MakeFileChannel(
+		    (ClientData)fileno(ApacheUpload_FILE(upload)), TCL_READABLE);
+#endif
 		Tcl_SetChannelOption(interp, chan, "-translation", "binary");
 
 		while ((sz = Tcl_Read(chan, savebuffer, BUFSZ)))
@@ -795,8 +807,14 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		    Tcl_Channel chan = NULL;
 
 		    bytes = Tcl_Alloc((unsigned int)ApacheUpload_size(upload));
-		    chan = Tcl_MakeFileChannel((ClientData)fileno(
-			ApacheUpload_FILE(upload)), TCL_READABLE);
+#ifdef __MINGW32__
+		    chan = Tcl_MakeFileChannel(
+			(ClientData)_get_osfhandle(
+			    fileno(ApacheUpload_FILE(upload))), TCL_READABLE);
+#else
+		    chan = Tcl_MakeFileChannel(
+			(ClientData)fileno(ApacheUpload_FILE(upload)), TCL_READABLE);
+#endif
 		    Tcl_SetChannelOption(interp, chan, "-translation", "binary");
 		    Tcl_SetChannelOption(interp, chan, "-encoding", "binary");
 		    /* put data in a variable  */

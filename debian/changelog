@@ -1,3 +1,9 @@
+libapache-mod-dtcl (1.0.1-1) unstable; urgency=low
+
+  * Made file upload stuff work on windows, thanks to Holger Zeinert.
+
+ -- David N. Welton <davidw@debian.org>  Tue,  7 Jan 2003 14:18:02 -0800
+
 libapache-mod-dtcl (1.0.0-1) unstable; urgency=low
 
   * Cleanup after HEAD requests.
