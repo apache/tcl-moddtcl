@@ -56,9 +56,8 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 
 	    if (c == strstart[p])
 	    {
-		if ((++p) == endseqlen)
+		if ((++p) == startseqlen)
 		{
-		    /* ok, we have matched the whole ending sequence - do something  */
 		    Tcl_DStringAppend(&dstr, "\"\n", 2);
 		    inside = 1;
 		    p = 0;
@@ -119,7 +118,7 @@ int dtcl_parser(Tcl_Obj *outbuf, FILE *openfile)
 
 	    if (c == strend[p])
 	    {
-		if ((++p) == startseqlen)
+		if ((++p) == endseqlen)
 		{
 		    Tcl_DStringAppend(&dstr, "\n hputs \"", -1);
 		    inside = 0;
