@@ -18,16 +18,15 @@
 
 #define BUFSZ 4096
 
-extern request_rec *global_rr;
+extern module dtcl_module;
+
 extern obuff obuffer;
 extern int content_sent;
 extern int buffer_output;
 extern int headers_printed;
-extern int cacheFreeSize;
-extern int upload_files_to_var;
 extern Tcl_Obj *uploadstorage[];
 
-extern ApacheRequest *global_req;
+#define POOL (globals->r->pool)
 
 /* Include and parse a file */
 
@@ -36,6 +35,8 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     char *filename;
     struct stat finfo;
 
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
     if (objc != 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "filename");
@@ -43,7 +44,7 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
     }
 
     filename = Tcl_GetStringFromObj (objv[1], (int *)NULL);
-    if (!strcmp(filename, global_rr->filename))
+    if (!strcmp(filename, globals->r->filename))
     {
 	Tcl_AddErrorInfo(interp, "Cannot recursively call the same file!");
 	return TCL_ERROR;
@@ -54,7 +55,7 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	Tcl_AddErrorInfo(interp, Tcl_PosixError(interp));
 	return TCL_ERROR;
     }
-    if (get_parse_exec_file(global_rr, 0) == OK)
+    if (get_parse_exec_file(globals->r, 0) == OK)
 	return TCL_OK;
     else
 	return TCL_ERROR;
@@ -83,8 +84,8 @@ int Include(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
     } else {
 	Tcl_SetChannelOption(interp, fd, "-translation", "lf");
     }
-/*     print_headers(global_rr);
-       flush_output_buffer(global_rr);  */
+/*     print_headers(globals->r);
+       flush_output_buffer(globals->r);  */
     while ((sz = Tcl_Read(fd, buf, BUFSZ - 1)))
     {
 	if (sz == -1)
@@ -132,6 +133,9 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 {
     char *arg1;
     int length;
+
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "?-error? string");
@@ -148,7 +152,7 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	    return TCL_ERROR;
 	}
 	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE,
-		     global_rr->server, "Mod_Dtcl Error: %s",
+		     globals->r->server, "Mod_Dtcl Error: %s",
 		     Tcl_GetStringFromObj (objv[2], (int *)NULL));
     } else {
 	if (objc != 2)
@@ -160,9 +164,9 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	{
 	    memwrite(&obuffer, arg1, length);
 	} else {
-	    print_headers(global_rr);
-	    flush_output_buffer(global_rr);
-	    ap_rwrite(arg1, length, global_rr);
+	    print_headers(globals->r);
+	    flush_output_buffer(globals->r);
+	    ap_rwrite(arg1, length, globals->r);
 	}
     }
 
@@ -174,6 +178,8 @@ int Hputs(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
     char *opt;
+
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
     if (objc < 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "option arg ?arg ...?");
@@ -206,7 +212,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	{
 	    stringopts[i] = Tcl_GetString(objv[i + 2]);
 	}
-	cookie = ApacheCookie_new(global_rr,
+	cookie = ApacheCookie_new(globals->r,
 				  stringopts[0], stringopts[1],
 				  stringopts[2], stringopts[3],
 				  stringopts[4], stringopts[5],
@@ -223,8 +229,8 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	    Tcl_WrongNumArgs(interp, 2, objv, "new-url");
 	    return TCL_ERROR;
 	}
-	ap_table_set(global_rr->headers_out, "Location", Tcl_GetStringFromObj (objv[2], (int *)NULL));
-	global_rr->status = 301;
+	ap_table_set(globals->r->headers_out, "Location", Tcl_GetStringFromObj (objv[2], (int *)NULL));
+	globals->r->status = 301;
 	return TCL_RETURN;
     }
     else if (!strcmp("set", opt)) /* ### set ### */
@@ -234,7 +240,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	    Tcl_WrongNumArgs(interp, 2, objv, "headername value");
 	    return TCL_ERROR;
 	}
-	ap_table_set(global_rr->headers_out,
+	ap_table_set(globals->r->headers_out,
 		     Tcl_GetStringFromObj (objv[2], (int *)NULL),
 		     Tcl_GetStringFromObj (objv[3], (int *)NULL));
     }
@@ -245,7 +251,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	    Tcl_WrongNumArgs(interp, 2, objv, "mime/type");
 	    return TCL_ERROR;
 	}
-	set_header_type(global_rr, Tcl_GetStringFromObj(objv[2], (int *)NULL));
+	set_header_type(globals->r, Tcl_GetStringFromObj(objv[2], (int *)NULL));
     } else if (!strcmp("numeric", opt)) /* ### numeric ### */
     {
 	int st = 200;
@@ -256,7 +262,7 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 	    return TCL_ERROR;
 	}
 	if (Tcl_GetIntFromObj(interp, objv[2], &st) != TCL_ERROR)
-	    global_rr->status = st;
+	    globals->r->status = st;
 	else
 	    return TCL_ERROR;
     } else {
@@ -270,19 +276,23 @@ int Headers(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST 
 
 int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-    char *opt = Tcl_GetStringFromObj(objv[1], NULL);
+    char *opt = NULL; 
+
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
     if (objc != 2)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, "on/off");
 	return TCL_ERROR;
     }
+    opt = Tcl_GetStringFromObj(objv[1], NULL);
     if (!strncmp(opt, "on", 2))
     {
 	buffer_output = 1;
     } else if (!strncmp(opt, "off", 3)) {
 	buffer_output = 0;
-	print_headers(global_rr);
-	flush_output_buffer(global_rr);
+	print_headers(globals->r);
+	flush_output_buffer(globals->r);
     } else {
 	return TCL_ERROR;
     }
@@ -292,14 +302,16 @@ int Buffered(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 
 int HFlush(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
     if (objc != 1)
     {
 	Tcl_WrongNumArgs(interp, 1, objv, NULL);
 	return TCL_ERROR;
     }
-    print_headers(global_rr);
-    flush_output_buffer(global_rr);
-    ap_rflush(global_rr);
+    print_headers(globals->r);
+    flush_output_buffer(globals->r);
+    ap_rflush(globals->r);
     return TCL_OK;
 }
 
@@ -317,7 +329,7 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     char *t;
     char *authorization = NULL;
 
-    time_t date = global_rr->request_time;
+    time_t date;
 
     int i;
 
@@ -326,68 +338,74 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     array_header *env_arr;
     table_entry  *env;
 
-    Tcl_Obj *EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
+    dtcl_interp_globals *globals = NULL;
+    Tcl_Obj *EnvsObj = NULL;
+
+    globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+
+    EnvsObj = Tcl_NewStringObj("::request::ENVS", -1);
     Tcl_IncrRefCount(EnvsObj);
+    date = globals->r->request_time;
     /* ensure that the system area which holds the cgi variables is empty */
-    ap_clear_table(global_rr->subprocess_env);
+    ap_clear_table(globals->r->subprocess_env);
 
     /* retrieve cgi variables */
-    ap_add_cgi_vars(global_rr);
-    ap_add_common_vars(global_rr);
+    ap_add_cgi_vars(globals->r);
+    ap_add_common_vars(globals->r);
 
-    hdrs_arr = ap_table_elts(global_rr->headers_in);
+    hdrs_arr = ap_table_elts(globals->r->headers_in);
     hdrs = (table_entry *) hdrs_arr->elts;
 
-    env_arr =  ap_table_elts(global_rr->subprocess_env);
+    env_arr =  ap_table_elts(globals->r->subprocess_env);
     env     = (table_entry *) env_arr->elts;
 
     /* Get the user/pass info for Basic authentication */
-    (const char*)authorization = ap_table_get(global_rr->headers_in, "Authorization");
-    if (authorization && !strcasecmp(ap_getword_nc(global_rr->pool, &authorization, ' '), "Basic"))
+    (const char*)authorization = ap_table_get(globals->r->headers_in, "Authorization");
+    if (authorization && !strcasecmp(ap_getword_nc(POOL, &authorization, ' '), "Basic"))
     {
 	char *tmp;
 	char *user;
 	char *pass;
 
-	tmp = ap_pbase64decode(global_rr->pool, authorization);
-	user = ap_getword_nulls_nc(global_rr->pool, &tmp, ':');
+	tmp = ap_pbase64decode(POOL, authorization);
+	user = ap_getword_nulls_nc(POOL, &tmp, ':');
 	pass = tmp;
  	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1),
 		       Tcl_NewStringObj("user", -1),
-		       STRING_TO_UTF_TO_OBJ(user),
+		       STRING_TO_UTF_TO_OBJ(user, POOL),
 		       0);
  	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::request::USER", -1),
 		       Tcl_NewStringObj("pass", -1),
-		       STRING_TO_UTF_TO_OBJ(pass),
+		       STRING_TO_UTF_TO_OBJ(pass, POOL),
 		       0);
     }
 
     /* These were the "include vars"  */
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 0)), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_GMT", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, date, timefmt, 1)), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("LAST_MODIFIED", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(global_rr->pool, global_rr->finfo.st_mtime, timefmt, 0)), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_URI", -1), STRING_TO_UTF_TO_OBJ(global_rr->uri), 0);
-    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_PATH_INFO", -1), STRING_TO_UTF_TO_OBJ(global_rr->path_info), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_LOCAL", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 0), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DATE_GMT", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, date, timefmt, 1), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("LAST_MODIFIED", -1), STRING_TO_UTF_TO_OBJ(ap_ht_time(POOL, globals->r->finfo.st_mtime, timefmt, 0), POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_URI", -1), STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
+    Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_PATH_INFO", -1), STRING_TO_UTF_TO_OBJ(globals->r->path_info, POOL), 0);
 
 #ifndef WIN32
-    pw = getpwuid(global_rr->finfo.st_uid);
+    pw = getpwuid(globals->r->finfo.st_uid);
     if (pw)
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1), STRING_TO_UTF_TO_OBJ(ap_pstrdup(global_rr->pool, pw->pw_name)), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1), STRING_TO_UTF_TO_OBJ(ap_pstrdup(POOL, pw->pw_name), POOL), 0);
     else
 	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("USER_NAME", -1),
-		       STRING_TO_UTF_TO_OBJ(ap_psprintf(global_rr->pool, "user#%lu", (unsigned long) global_rr->finfo.st_uid)), 0);
+		       STRING_TO_UTF_TO_OBJ(ap_psprintf(POOL, "user#%lu", (unsigned long) globals->r->finfo.st_uid), POOL), 0);
 #endif
 
-    if ((t = strrchr(global_rr->filename, '/')))
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(++t), 0);
+    if ((t = strrchr(globals->r->filename, '/')))
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(++t, POOL), 0);
     else
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(global_rr->uri), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("DOCUMENT_NAME", -1), STRING_TO_UTF_TO_OBJ(globals->r->uri, POOL), 0);
 
-    if (global_rr->args)
+    if (globals->r->args)
     {
-	char *arg_copy = ap_pstrdup(global_rr->pool, global_rr->args);
+	char *arg_copy = ap_pstrdup(POOL, globals->r->args);
 	ap_unescape_url(arg_copy);
-	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("QUERY_STRING_UNESCAPED", -1), STRING_TO_UTF_TO_OBJ(ap_escape_shell_cmd(global_rr->pool, arg_copy)), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, Tcl_NewStringObj("QUERY_STRING_UNESCAPED", -1), STRING_TO_UTF_TO_OBJ(ap_escape_shell_cmd(POOL, arg_copy), POOL), 0);
     }
 
     /* ----------------------------  */
@@ -398,7 +416,7 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 	if (!hdrs[i].key)
 	    continue;
 	else {
-	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key), STRING_TO_UTF_TO_OBJ(hdrs[i].val), 0);
+	    Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(hdrs[i].key, POOL), STRING_TO_UTF_TO_OBJ(hdrs[i].val, POOL), 0);
 	}
     }
 
@@ -407,11 +425,11 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     {
 	if (!env[i].key)
 	    continue;
-	Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(env[i].key), STRING_TO_UTF_TO_OBJ(env[i].val), 0);
+	Tcl_ObjSetVar2(interp, EnvsObj, STRING_TO_UTF_TO_OBJ(env[i].key, POOL), STRING_TO_UTF_TO_OBJ(env[i].val, POOL), 0);
     }
 
     do { /* I do this because I want some 'local' variables */
-	ApacheCookieJar *cookies = ApacheCookie_parse(global_rr, NULL);
+	ApacheCookieJar *cookies = ApacheCookie_parse(globals->r, NULL);
 	Tcl_Obj *cookieobj = Tcl_NewStringObj("::request::COOKIES", -1);
 
 	for (i = 0; i < ApacheCookieJarItems(cookies); i++) {
@@ -421,15 +439,15 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
 		char *name = c->name;
 		char *value = ApacheCookieFetch(c, j);
 		Tcl_ObjSetVar2(interp, cookieobj,
-			       STRING_TO_UTF_TO_OBJ(name),
-			       STRING_TO_UTF_TO_OBJ(value), 0);
+			       STRING_TO_UTF_TO_OBJ(name, POOL),
+			       STRING_TO_UTF_TO_OBJ(value, POOL), 0);
 	    }
 
 	}
     } while (0);
 
     /* cleanup system cgi variables */
-    ap_clear_table(global_rr->subprocess_env);
+    ap_clear_table(globals->r->subprocess_env);
 
     return TCL_OK;
 }
@@ -449,7 +467,8 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
     char *command;
     int i;
     Tcl_Obj *result = NULL;
-    array_header *parmsarray = ap_table_elts(global_req->parms);
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    array_header *parmsarray = ap_table_elts(globals->req->parms);
     table_entry *parms = (table_entry *)parmsarray->elts;
 
     if (objc < 2 || objc > 3)
@@ -473,18 +492,18 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
            on... */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
 	    {
 		/* The following makes sure that we get one string,
                    with no sub lists. */
 		if (result == NULL)
 		{
-		    result = STRING_TO_UTF_TO_OBJ(parms[i].val);
+		    result = STRING_TO_UTF_TO_OBJ(parms[i].val, POOL);
 		    Tcl_IncrRefCount(result);
 		} else {
 		    Tcl_Obj *tmpobjv[2];
 		    tmpobjv[0] = result;
-		    tmpobjv[1] = STRING_TO_UTF_TO_OBJ(parms[i].val);
+		    tmpobjv[1] = STRING_TO_UTF_TO_OBJ(parms[i].val, POOL);
 		    result = Tcl_ConcatObj(2, tmpobjv);
 		}
 	    }
@@ -506,7 +525,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
         /* This isn't real efficient - move to hash table later on. */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
 	    {
 		result = Tcl_NewIntObj(1);
 		Tcl_IncrRefCount(result);
@@ -530,7 +549,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
         /* This isn't real efficient - move to hash table later on. */
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
-	    if (!strncmp(key, StringToUtf(parms[i].key), strlen(key)))
+	    if (!strncmp(key, StringToUtf(parms[i].key, POOL), strlen(key)))
 	    {
 		if (result == NULL)
 		{
@@ -538,7 +557,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 		    Tcl_IncrRefCount(result);
 		}
 		Tcl_ListObjAppendElement(interp, result,
-					 STRING_TO_UTF_TO_OBJ(parms[i].val));
+					 STRING_TO_UTF_TO_OBJ(parms[i].val, POOL));
 	    }
 	}
 
@@ -557,7 +576,7 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
 	    Tcl_ListObjAppendElement(interp, result,
-				     STRING_TO_UTF_TO_OBJ(parms[i].key));
+				     STRING_TO_UTF_TO_OBJ(parms[i].key, POOL));
 	}
 
 	if (result == NULL)
@@ -586,9 +605,9 @@ int Var(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv
 	for (i = 0; i < parmsarray->nelts; ++i)
 	{
 	    Tcl_ListObjAppendElement(interp, result,
-				     STRING_TO_UTF_TO_OBJ(parms[i].key));
+				     STRING_TO_UTF_TO_OBJ(parms[i].key, POOL));
 	    Tcl_ListObjAppendElement(interp, result,
-				     STRING_TO_UTF_TO_OBJ(parms[i].val));
+				     STRING_TO_UTF_TO_OBJ(parms[i].val, POOL));
 	}
 
 	if (result == NULL)
@@ -632,6 +651,10 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
     char *command = NULL;
     Tcl_Obj *result = NULL;
     ApacheUpload *upload;
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = NULL;
+
+    dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
 
     if (objc < 2 || objc > 5)
     {
@@ -650,7 +673,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	    return TCL_ERROR;
 	}
 	varname = Tcl_GetString(objv[2]);
-	upload = ApacheUpload_find(global_req->upload, varname);
+	upload = ApacheUpload_find(globals->req->upload, varname);
 	if (upload != NULL) /* make sure we have an upload */
 	{
 	    Tcl_Channel chan;
@@ -707,7 +730,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	    } else if (!strcmp(method, "data")) {
 		/* this sucks - we should use the hook, but I want to
                    get everything fixed and working first */
-		if (upload_files_to_var)
+		if (dsc->upload_files_to_var)
 		{
 		    char *bytes = NULL;
 		    Tcl_Channel chan = NULL;
@@ -739,7 +762,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	varname = Tcl_GetString(objv[2]);
 	infotype = Tcl_GetString(objv[3]);
 
-	upload = ApacheUpload_find(global_req->upload, varname);
+	upload = ApacheUpload_find(globals->req->upload, varname);
 	if (upload != NULL)
 	{
 	    if (!strcmp(infotype, "exists"))
@@ -755,7 +778,7 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 		else
 		    Tcl_SetStringObj(result, "", -1);
 	    } else if (!strcmp(infotype, "filename")) {
-		Tcl_SetStringObj(result, StringToUtf(upload->filename), -1);
+		Tcl_SetStringObj(result, StringToUtf(upload->filename, POOL), -1);
 	    } else {
 		Tcl_AddErrorInfo(interp, "unknown upload info command, should be exists|size|type|filename");
 		return TCL_ERROR;
@@ -769,11 +792,11 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 	    }
 	}
     } else if (!strcmp(command, "names")) {
-	upload = ApacheRequest_upload(global_req);
+	upload = ApacheRequest_upload(globals->req);
 	while (upload)
 	{
 	    Tcl_ListObjAppendElement(interp, result, 
-				     STRING_TO_UTF_TO_OBJ(upload->name));
+				     STRING_TO_UTF_TO_OBJ(upload->name, POOL));
 	    upload = upload->next;
 	}
     } else {
@@ -791,16 +814,19 @@ int Upload(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST o
 int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
     char *tble;
-    tble = ap_psprintf(global_rr->pool,
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
+    dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(globals->r->server->module_config, &dtcl_module);
+
+    tble = ap_psprintf(POOL,
 		       "<table border=0 bgcolor=green><tr><td>\n"
 		       "<table border=0 bgcolor=\"#000000\">\n"
 		       "<tr><td align=center bgcolor=blue><font color=\"#ffffff\" size=\"+2\">dtcl_info</font><br></td></tr>\n"
 		       "<tr><td><font color=\"#ffffff\">Free cache size: %d</font><br></td></tr>\n"
 		       "<tr><td><font color=\"#ffffff\">PID: %d</font><br></td></tr>\n"
 		       "</table>\n"
-		       "</td></tr></table>\n", cacheFreeSize, getpid());
-/*     print_headers(global_rr);
-    flush_output_buffer(global_rr);  */
+		       "</td></tr></table>\n", dsc->cache_free, getpid());
+/*     print_headers(globals->r);
+    flush_output_buffer(globals->r);  */
     memwrite(&obuffer, tble, strlen(tble));
     return TCL_OK;
 }
@@ -810,10 +836,11 @@ int Dtcl_Info(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 
 int No_Body(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
+    dtcl_interp_globals *globals = Tcl_GetAssocData(interp, "dtcl", NULL);
     if (content_sent == 1)
 	return TCL_ERROR;
 
-    print_headers(global_rr);
+    print_headers(globals->r);
     Tcl_Free(obuffer.buf);
     obuffer.buf = NULL;
     obuffer.len = 0;

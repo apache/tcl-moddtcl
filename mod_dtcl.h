@@ -54,19 +54,44 @@
 /* #define DTCL_VERSION "X.X.X" */
 
 typedef struct {
+    Tcl_Interp *server_interp;          /* per server Tcl interpreter */
+    Tcl_Obj *dtcl_global_init_script;   /* run once when apache is first started */
+    Tcl_Obj *dtcl_child_init_script;
+    Tcl_Obj *dtcl_child_exit_script;
+    Tcl_Obj *dtcl_before_script;        /* script run before each page */
+    Tcl_Obj *dtcl_after_script;         /*            after            */
+    Tcl_Obj *dtcl_error_script;         /*            for errors */
+    int cache_size;
+    int cache_free;
+    int upload_max;
+    int upload_files_to_var;
+    char *server_name;
+    char *upload_dir;
+} dtcl_server_conf;
+
+/* eventually we will transfer 'global' variables in here and
+   'de-globalize' them */
+
+typedef struct {
+    request_rec *r;		/* request rec */
+    ApacheRequest *req;     /* libapreq request  */
+} dtcl_interp_globals;
+
+typedef struct {
     char *buf;
     int len;
 } obuff;
 
 int memwrite(obuff *, char *, int);
-int get_parse_exec_file(request_rec *r, int toplevel);
+int get_parse_exec_file(request_rec *r,  int toplevel);
 int set_header_type(request_rec *, char *);
 int print_headers(request_rec *);
 int print_error(request_rec *, int, char *);
 int flush_output_buffer(request_rec *);
-char *StringToUtf(char *input);
+char *StringToUtf(char *input, ap_pool *pool);
+dtcl_server_conf *dtcl_get_conf(request_rec *r);
 
 /* Macro to Tcl Objectify StringToUtf stuff */
-#define STRING_TO_UTF_TO_OBJ(string) Tcl_NewStringObj(StringToUtf(string), -1)
+#define STRING_TO_UTF_TO_OBJ(string, pool) Tcl_NewStringObj(StringToUtf(string, pool), -1)
 
 #endif
