@@ -51,7 +51,7 @@ int Parse(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST ob
 	Tcl_AddErrorInfo(interp, Tcl_PosixError(interp));
 	return TCL_ERROR;
     }
-    if (send_parsed_file(global_rr, filename, &finfo, 0) == OK)
+    if (get_parse_exec_file(global_rr, 0) == OK)
 	return TCL_OK;
     else
 	return TCL_ERROR;

@@ -102,18 +102,18 @@ obuff obuffer = {
     0
 };
 
-Tcl_Obj *namespacePrologue;      /* initial bit of Tcl for namespace creation */
+static Tcl_Obj *namespacePrologue;      /* initial bit of Tcl for namespace creation */
 module MODULE_VAR_EXPORT dtcl_module;
 
-char **objCacheList; 		/* Array of cached objects (for priority handling) */
-Tcl_HashTable objCache; 		/* Objects cache - the key is the script name */
+static char **objCacheList; 		/* Array of cached objects (for priority handling) */
+static Tcl_HashTable objCache; 		/* Objects cache - the key is the script name */
 
 int buffer_output = 0;           /* Start with output buffering off */
 int headers_printed = 0; 	/* has the header been printed yet? */
-int headers_set = 0; 	        /* has the header been set yet? */
+static int headers_set = 0; 	        /* has the header been set yet? */
 int content_sent = 0;            /* make sure something gets sent */
 
-int cacheSize = 0;               /* size of cache, determined
+static int cacheSize = 0;               /* size of cache, determined
                                            either in conf files, or
                                            set to
                                            "ap_max_requests_per_child
@@ -121,24 +121,29 @@ int cacheSize = 0;               /* size of cache, determined
                                            dtcl_init_handler function */
 int cacheFreeSize = 0;           /* free space in cache */
 
-int upload_files_to_var = 0;
+static int upload_files_to_var = 0;
 
-char *upload_dir = "/tmp/";      /* Upload directory */
-unsigned int upload_max = 0;              /* Maximum amount of data that may be uploaded */
+static char *upload_dir = "/tmp/";      /* Upload directory */
+static unsigned int upload_max = 0;              /* Maximum amount of data that may be uploaded */
 
 typedef struct {
     Tcl_Interp *server_interp;          /* per server Tcl interpreter */
     Tcl_Obj *dtcl_global_init_script;   /* run once when apache is first started */
-    Tcl_Obj *dtcl_child_init_script;     
+    Tcl_Obj *dtcl_child_init_script;
     Tcl_Obj *dtcl_child_exit_script;
     Tcl_Obj *dtcl_before_script;        /* script run before each page */
     Tcl_Obj *dtcl_after_script;         /*            after            */
-    Tcl_Obj *dtcl_error_script;         /*            after            */
+    Tcl_Obj *dtcl_error_script;         /*            for errors */
     int dtcl_cache_size;
     char *server_name; 
 } dtcl_server_conf;
 
 #define GETREQINTERP(req) ((dtcl_server_conf *)ap_get_module_config(req->server->module_config, &dtcl_module))->server_interp
+
+static void tcl_init_stuff(server_rec *s, pool *p);
+static int send_content(request_rec *);
+static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r);
+static dtcl_server_conf *dtcl_get_conf(request_rec *r);
 
 /* Functions for Tcl Channel */
 
@@ -352,84 +357,53 @@ int dtcl_upload_hook(void *ptr, char *buf, int len, ApacheUpload *upload)
 
 /* Load, cache and eval a Tcl file  */
 
-int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
+static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, struct stat *finfo, Tcl_Obj *outbuf)
 {
+    int result = 0;
 #if 1
     /* Taken, in part, from tclIOUtil.c out of the Tcl
        distribution, and modified */
 
     /* Basically, what we are doing here is a Tcl_EvalFile, but
        with the addition of caching code. */
-    int result;
-    int isNew;
-
-    char *hashKey;
-
-    Tcl_HashEntry *entry;
-    Tcl_Obj *cmdObjPtr = NULL;
-
-    Tcl_Interp *interp = GETREQINTERP(r);
-
-    /* Look for the script's compiled version. If it's not found, create it. */
-    hashKey = ap_psprintf(r->pool, "%s%ld%ld", r->filename, r->finfo.st_mtime, r->finfo.st_ctime);
-    entry = Tcl_CreateHashEntry(&objCache, hashKey, &isNew);
-    if (isNew || !cacheSize) {
-	char *cmdBuffer = (char *) NULL;
-	Tcl_Channel chan = Tcl_OpenFileChannel(interp, r->filename, "r", 0644);
-	if (chan == (Tcl_Channel) NULL) 
-	{
-	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
-			     "\": ", Tcl_PosixError(interp), (char *) NULL);
-	    goto error;
-	}
-
-	cmdBuffer = (char *) malloc(r->finfo.st_size + 1);
-
-	result = Tcl_Read(chan, cmdBuffer, r->finfo.st_size);
-	if (result < 0) 
-	{
-	    Tcl_Close(interp, chan);
-	    Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
-			     "\": ", Tcl_PosixError(interp), (char *) NULL);
-	    goto error;
-	}
-	cmdBuffer[result] = 0;
-
-	if (Tcl_Close(interp, chan) != TCL_OK) 
-	    goto error;
-
-	cmdObjPtr = Tcl_NewStringObj(cmdBuffer, result);
-	Tcl_IncrRefCount(cmdObjPtr);
-	Tcl_SetHashValue(entry, (ClientData)cmdObjPtr);
-	free(cmdBuffer);
-
-	if (cacheFreeSize) {
-	    /* This MUST be malloc-ed, because it's permanent */
-	    objCacheList[--cacheFreeSize ] = strdup(hashKey);
-	} else if (cacheSize) { /* if it's zero, we just skip this... */
-	    Tcl_HashEntry *delEntry;		
-	    delEntry = Tcl_FindHashEntry(&objCache, objCacheList[cacheSize - 1]);
-	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
-	    Tcl_DeleteHashEntry(delEntry);
-	    free(objCacheList[cacheSize - 1]);
-	    memmove(objCacheList + 1, objCacheList, sizeof(char *)*(cacheSize -1));
-	    objCacheList[0] = strdup(hashKey);
-	}
-	    
-	/* yuck  */
-	goto end;
-    error:
-	if (cmdBuffer != (char *) NULL) {
-	    free(cmdBuffer);
-	}
-	return TCL_ERROR;	
-	    
-    end:
-	return execute_and_check(interp, (cmdObjPtr), r);
-    } else {
-	return execute_and_check(interp, (Tcl_Obj *)Tcl_GetHashValue(entry), r);
+    char *cmdBuffer = (char *) NULL;
+    Tcl_Channel chan = Tcl_OpenFileChannel(interp, r->filename, "r", 0644);
+    if (chan == (Tcl_Channel) NULL) 
+    {
+	Tcl_ResetResult(interp);
+	Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
+			 "\": ", Tcl_PosixError(interp), (char *) NULL);
+	goto error;
     }
+    
+    cmdBuffer = (char *) malloc(r->finfo.st_size + 1);
+    
+    result = Tcl_Read(chan, cmdBuffer, r->finfo.st_size);
+    if (result < 0) 
+    {
+	Tcl_Close(interp, chan);
+	Tcl_AppendResult(interp, "couldn't read file \"", r->filename,
+			 "\": ", Tcl_PosixError(interp), (char *) NULL);
+	goto error;
+    }
+    cmdBuffer[result] = 0;
+    
+    if (Tcl_Close(interp, chan) != TCL_OK) 
+	goto error;
+    
+    Tcl_SetStringObj(outbuf, cmdBuffer, strlen(cmdBuffer));   
+    free(cmdBuffer);
+        
+    /* yuck  */
+    goto end;
+error:
+    if (cmdBuffer != (char *) NULL) {
+	free(cmdBuffer);
+    }
+    return TCL_ERROR;
+    
+end:
+    return TCL_OK;
 #else
     Tcl_EvalFile(interp, r->filename);
 #endif /* 1 */
@@ -437,223 +411,185 @@ int send_tcl_file(request_rec *r, char *filename, struct stat *finfo)
 
 /* Parse and execute a ttml file */
 
-int send_parsed_file(request_rec *r, char *filename, struct stat *finfo, int toplevel)
+static int get_ttml_file(request_rec *r, Tcl_Interp *interp, char *filename, int toplevel, Tcl_Obj *outbuf)
 {
-    char *hashKey;
-    int isNew;
-
-    dtcl_server_conf *dsc = NULL;
-
-    Tcl_Obj *outbuf;
-    Tcl_HashEntry *entry;
-    Tcl_Interp *interp = GETREQINTERP(r);
-
-    /* Look for the script's compiled version. If it's not found, create it. */
-    hashKey = ap_psprintf(r->pool, "%s%ld%ld%d", filename, finfo->st_mtime, finfo->st_ctime, toplevel);
-    entry = Tcl_CreateHashEntry(&objCache, hashKey, &isNew);
-    if (isNew || !cacheSize) {
-	/* BEGIN PARSER  */
-	char inside = 0;	/* are we inside the starting/ending delimiters  */
+    /* BEGIN PARSER  */
+    char inside = 0;	/* are we inside the starting/ending delimiters  */
 	
-	const char *strstart = STARTING_SEQUENCE;
-	const char *strend = ENDING_SEQUENCE;
+    const char *strstart = STARTING_SEQUENCE;
+    const char *strend = ENDING_SEQUENCE;
 
-	char c;
-	int ch;
-	int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
+    char c;
+    int ch;
+    int endseqlen = strlen(ENDING_SEQUENCE), startseqlen = strlen(STARTING_SEQUENCE), p = 0;
 
-	FILE *f = NULL;
+    FILE *f = NULL;
 
-	dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
-	if (!(f = ap_pfopen(r->pool, filename, "r")))
-	{
-	    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
-			 "file permissions deny server access: %s", filename);
-	    return HTTP_FORBIDDEN;
-	}
+    dtcl_server_conf *conf = NULL;
+    conf = dtcl_get_conf(r);
 
-	/* Beginning of the file parser */
-	if (toplevel)
-	{
-	    outbuf = Tcl_NewStringObj("namespace eval request {\n", -1);
-	    if (dsc->dtcl_before_script)
-		Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
-	    Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
-	}
-	else
-	    outbuf = Tcl_NewStringObj("hputs \"\n", -1);
+    if (!(f = ap_pfopen(r->pool, filename, "r")))
+    {
+	ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
+		     "file permissions deny server access: %s", filename);
+	return HTTP_FORBIDDEN;
+    }
 
-	while ((ch = getc(f)) != EOF)
-	{
-	    if (ch == -1)
-		if (ferror(f))
-		{
-		    ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
-				 "Encountered error in mod_dtcl getchar routine while reading %s",
-				 r->uri);
-			ap_pfclose( r->pool, f);
-		}	    
-	    c = ch;
-	    if (!inside)
+    /* Beginning of the file parser */
+    if (toplevel)
+    {
+	Tcl_SetStringObj(outbuf, "namespace eval request {\n", -1);
+	if (conf->dtcl_before_script)
+	    Tcl_AppendObjToObj(outbuf, conf->dtcl_before_script);
+	Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
+    }
+    else
+	Tcl_SetStringObj(outbuf, "hputs \"\n", -1);
+
+    while ((ch = getc(f)) != EOF)
+    {
+	if (ch == -1)
+	    if (ferror(f))
 	    {
-		/* OUTSIDE  */
+		ap_log_error(APLOG_MARK, APLOG_ERR, r->server,
+			     "Encountered error in mod_dtcl getchar routine while reading %s",
+			     r->uri);
+		ap_pfclose( r->pool, f);
+	    }	    
+	c = ch;
+	if (!inside)
+	{
+	    /* OUTSIDE  */
 
 #if USE_OLD_TAGS == 1
-		if (c == '<')
+	    if (c == '<')
+	    {
+		int nextchar = getc(f);
+		if (nextchar == '+')
 		{
-		    int nextchar = getc(f);
-		    if (nextchar == '+')
-		    {
-			Tcl_AppendToObj(outbuf, "\"\n", 2);
-			inside = 1;
-			p = 0;
-			continue;			
-		    } else {
-			ungetc(nextchar, f);
-		    }
+		    Tcl_AppendToObj(outbuf, "\"\n", 2);
+		    inside = 1;
+		    p = 0;
+		    continue;			
+		} else {
+		    ungetc(nextchar, f);
 		}
+	    }
 #endif
 
-		if (c == strstart[p])
+	    if (c == strstart[p])
+	    {
+		if ((++p) == endseqlen)
 		{
-		    if ((++p) == endseqlen)
-		    {
-			/* ok, we have matched the whole ending sequence - do something  */
-			Tcl_AppendToObj(outbuf, "\"\n", 2);
-			inside = 1;
-			p = 0;
-			continue;
-		    }
-		} else {
-		    if (p > 0)
-			Tcl_AppendToObj(outbuf, (char *)strstart, p);
-		    /* or else just put the char in outbuf  */
-		    if (c == '$')
-			Tcl_AppendToObj(outbuf, "\\$", -1);
-		    else if ( c == '[')
-			Tcl_AppendToObj(outbuf, "\\[", -1);
-		    else if ( c == ']')
-			Tcl_AppendToObj(outbuf, "\\]", -1);
-		    else if ( c == '"')
-			Tcl_AppendToObj(outbuf, "\\\"", -1);
-		    else if ( c == '\\')
-			Tcl_AppendToObj(outbuf, "\\\\", -1);
-		    else
-			Tcl_AppendToObj(outbuf, &c, 1);
-
+		    /* ok, we have matched the whole ending sequence - do something  */
+		    Tcl_AppendToObj(outbuf, "\"\n", 2);
+		    inside = 1;
 		    p = 0;
 		    continue;
 		}
 	    } else {
-		/* INSIDE  */
+		if (p > 0)
+		    Tcl_AppendToObj(outbuf, (char *)strstart, p);
+		/* or else just put the char in outbuf  */
+		if (c == '$')
+		    Tcl_AppendToObj(outbuf, "\\$", -1);
+		else if ( c == '[')
+		    Tcl_AppendToObj(outbuf, "\\[", -1);
+		else if ( c == ']')
+		    Tcl_AppendToObj(outbuf, "\\]", -1);
+		else if ( c == '"')
+		    Tcl_AppendToObj(outbuf, "\\\"", -1);
+		else if ( c == '\\')
+		    Tcl_AppendToObj(outbuf, "\\\\", -1);
+		else
+		    Tcl_AppendToObj(outbuf, &c, 1);
+
+		p = 0;
+		continue;
+	    }
+	} else {
+	    /* INSIDE  */
 
 #if USE_OLD_TAGS == 1
-		if (c == '+')
+	    if (c == '+')
+	    {
+		int nextchar = getc(f);
+		if (nextchar == '>')
 		{
-		    int nextchar = getc(f);
-		    if (nextchar == '>')
-		    {
-			Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
-			inside = 0;
-			p = 0;
-			continue;
-		    } else {
-			ungetc(nextchar, f);
-		    }
-		}
-#endif
-
-		if (c == strend[p])
-		{
-		    if ((++p) == startseqlen)
-		    {
-			Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
-			inside = 0;
-			p = 0;
-			continue;
-		    }
-		}
-		else
-		{
-		    /*  plop stuff into outbuf, which we will then eval   */
-		    if (p > 0)
-			Tcl_AppendToObj(outbuf, (char *)strend, p);
-		    Tcl_AppendToObj(outbuf, &c, 1);
+		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+		    inside = 0;
 		    p = 0;
+		    continue;
+		} else {
+		    ungetc(nextchar, f);
 		}
 	    }
-	}
-	ap_pfclose(r->pool, f);
+#endif
 
-	if (!inside)
-	{
-	    Tcl_AppendToObj(outbuf, "\"\n", 2);
+	    if (c == strend[p])
+	    {
+		if ((++p) == startseqlen)
+		{
+		    Tcl_AppendToObj(outbuf, "\n hputs \"", -1);
+		    inside = 0;
+		    p = 0;
+		    continue;
+		}
+	    }
+	    else
+	    {
+		/*  plop stuff into outbuf, which we will then eval   */
+		if (p > 0)
+		    Tcl_AppendToObj(outbuf, (char *)strend, p);
+		Tcl_AppendToObj(outbuf, &c, 1);
+		p = 0;
+	    }
 	}
+    }
+    ap_pfclose(r->pool, f);
+
+    if (!inside)
+    {
+	Tcl_AppendToObj(outbuf, "\"\n", 2);
+    }
 	
-	if (toplevel)
-	{
-	    if (dsc->dtcl_after_script)
-		Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
+    if (toplevel)
+    {
+	if (conf->dtcl_after_script)
+	    Tcl_AppendObjToObj(outbuf, conf->dtcl_after_script);
 	    
-	    Tcl_AppendToObj(outbuf, "\n}\nnamespace delete request\n", -1);
-	}
-	else
-	    Tcl_AppendToObj(outbuf, "\n", -1);
-
-	Tcl_IncrRefCount(outbuf);
+	Tcl_AppendToObj(outbuf, "\n}\nnamespace delete request\n", -1);
+    }
+    else
+	Tcl_AppendToObj(outbuf, "\n", -1);
 
 #if DTCL_I18N == 1
-	/* Convert to encoding  */
-	Tcl_SetStringObj(outbuf, StringToUtf(Tcl_GetString(outbuf)), -1);
+    /* Convert to encoding  */
+    Tcl_SetStringObj(outbuf, StringToUtf(Tcl_GetString(outbuf)), -1);
 #endif
 
-	Tcl_SetHashValue(entry, (ClientData)outbuf);
-
-	if (cacheFreeSize) {
-	    /* This MUST be malloc-ed, because it's permanent */
-	    objCacheList[--cacheFreeSize ] = strdup(hashKey);
-	} else if (cacheSize) { /* if it's zero, we just skip this... */
-	    Tcl_HashEntry *delEntry;
-
-	    /* a better algorithm wouldn't hurt */
-	    delEntry = Tcl_FindHashEntry(&objCache, objCacheList[cacheSize - 1]);
-	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
-	    Tcl_DeleteHashEntry(delEntry);
-	    free(objCacheList[cacheSize - 1]);
-	    memmove(objCacheList + 1, objCacheList, sizeof(char *)*(cacheSize -1));
-	    objCacheList[0] = strdup(hashKey);
-	}
-	/* END PARSER  */
-    } else {
-	/* used the cached version */
-        outbuf = (Tcl_Obj *)Tcl_GetHashValue(entry);
-    }
-
-#if DBG
-    print_error(r, 0,
-		Tcl_GetStringFromObj(outbuf, (int *)NULL));
-    return OK;
-#endif
-
-    return(execute_and_check(interp, outbuf, r));
+    /* END PARSER  */
+    return TCL_OK;
 }
 
 /* Calls Tcl_EvalObj() and checks for errors; prints the error buffer if any. */
 
-int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r)
+static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r)
 {
     char *errorinfo;
-    dtcl_server_conf *dsc = NULL; 
-    
-    dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
-    
+    dtcl_server_conf *conf = NULL;
+
+    conf = dtcl_get_conf(r);
     if (Tcl_EvalObj(interp, outbuf) == TCL_ERROR)
     {
+	Tcl_Obj *errscript = conf->dtcl_error_script ? conf->dtcl_error_script :
+	    conf->dtcl_error_script ? conf->dtcl_error_script : NULL;
+
         print_headers(global_rr);
         flush_output_buffer(global_rr);
-        if (dsc->dtcl_error_script)
+        if (errscript)
         {
-	    if (Tcl_EvalObj(interp, dsc->dtcl_error_script) == TCL_ERROR)
+	    if (Tcl_EvalObj(interp, errscript) == TCL_ERROR)
                 print_error(r, 1, "<b>Tcl_ErrorScript failed!</b>");
         } else {
             /* default action  */
@@ -672,11 +608,65 @@ int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r)
     return OK;
 }
 
+/* This is a seperate function so that it may be called from 'Parse' */
 
+int get_parse_exec_file(request_rec *r, int toplevel)
+{
+    char *hashKey = NULL;
+    int isNew = 0;
+    int result = 0;
+       
+    Tcl_Obj *outbuf = NULL;
+    Tcl_HashEntry *entry = NULL;
+    Tcl_Interp *interp = GETREQINTERP(r);
+       
+    /* Look for the script's compiled version. If it's not found, create it. */
+    if (cacheSize)
+    {
+	hashKey = ap_psprintf(r->pool, "%s%ld%ld%d", r->filename, r->finfo.st_mtime, r->finfo.st_ctime, toplevel);
+	entry = Tcl_CreateHashEntry(&objCache, hashKey, &isNew);
+    }
+    if (isNew || !cacheSize)
+    {
+	outbuf = Tcl_NewObj();
+	Tcl_IncrRefCount(outbuf);
+
+	if(!strcmp(r->content_type, "application/x-httpd-tcl"))
+	{ 
+	    /* It's a TTML file  */
+	    result = get_ttml_file(r, interp, r->filename, 1, outbuf);
+	} else { 	
+	    /* It's a plain Tcl file */
+	    result = get_tcl_file(r, interp, r->filename, &(r->finfo), outbuf);
+	}
+	if (result != TCL_OK)
+	    return result;
+
+	if (cacheSize)
+	    Tcl_SetHashValue(entry, (ClientData)outbuf);
+
+	if (cacheFreeSize) {
+	    /* This MUST be malloc-ed, because it's permanent */
+	    objCacheList[--cacheFreeSize ] = strdup(hashKey);
+	} else if (cacheSize) { /* if it's zero, we just skip this... */
+	    Tcl_HashEntry *delEntry;
+	    delEntry = Tcl_FindHashEntry(&objCache, objCacheList[cacheSize - 1]);
+	    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(delEntry));
+	    Tcl_DeleteHashEntry(delEntry);
+	    free(objCacheList[cacheSize - 1]);
+	    memmove(objCacheList + 1, objCacheList, sizeof(char *)*(cacheSize -1));
+	    objCacheList[0] = strdup(hashKey);
+	} 
+    } else {
+	outbuf = (Tcl_Obj *)Tcl_GetHashValue(entry);
+    }
+    execute_and_check(interp, outbuf, r);
+    return TCL_OK;
+}
 
 /* Set things up to execute a file, then execute */
 
-int send_content(request_rec *r)
+static int send_content(request_rec *r)
 {
     char error[MAX_STRING_LEN];
     char timefmt[MAX_STRING_LEN];
@@ -775,11 +765,11 @@ int send_content(request_rec *r)
 	
     }
 #endif 
-   upload = req->upload;
+    upload = req->upload;
 
-   /* Loop through uploaded files */
-   while (upload)
-   {
+    /* Loop through uploaded files */
+    while (upload)
+    {
 	char *type = NULL;
 	char *channelname = NULL;
 	Tcl_Channel chan;
@@ -829,15 +819,7 @@ int send_content(request_rec *r)
 	upload = upload->next;
     }
 
-    if(!strcmp(r->content_type, "application/x-httpd-tcl"))
-    { 
-	/* It's a TTML file  */
-	send_parsed_file(r, r->filename, &(r->finfo), 1);
-    } else { 	
-	/* It's a plain Tcl file */
-	send_tcl_file(r, r->filename, &(r->finfo));
-    }
-
+    get_parse_exec_file(r, 1);
     /* reset globals  */
     buffer_output = 0;
     headers_printed = 0;
@@ -850,7 +832,7 @@ int send_content(request_rec *r)
 /* This is done in two places, so I decided to group the creates in
    one function */
 
-void tcl_create_commands(Tcl_Interp *interp)
+static void tcl_create_commands(Tcl_Interp *interp)
 {
     Tcl_CreateObjCommand(interp, "hputs", Hputs, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
     Tcl_CreateObjCommand(interp, "buffer_add", Buffer_Add, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
@@ -865,7 +847,7 @@ void tcl_create_commands(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, "no_body", No_Body, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 }
 
-void tcl_init_stuff(server_rec *s, pool *p)
+static void tcl_init_stuff(server_rec *s, pool *p)
 {
     int rslt;
     Tcl_Channel achan;
@@ -944,8 +926,8 @@ void tcl_init_stuff(server_rec *s, pool *p)
     sr = s;
     while (sr)
     {
-	/* Ok, this stuff should set up slave interpreters for other
-           virtual hosts */
+	/* This should set up slave interpreters for other virtual
+           hosts */
 	dtcl_server_conf *mydsc = (dtcl_server_conf *) ap_get_module_config(sr->module_config, &dtcl_module);
 	if (!mydsc->server_interp)
 	{
@@ -971,7 +953,7 @@ MODULE_VAR_EXPORT void dtcl_init_handler(server_rec *s, pool *p)
 #endif /* !HIDE_DTCL_VERSION */
 }
 
-const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)
+static const char *set_script(cmd_parms *cmd, dtcl_server_conf *ddc, char *arg, char *arg2)
 {
     Tcl_Obj *objarg;
     server_rec *s = cmd->server;
@@ -988,20 +970,29 @@ const char *set_script(cmd_parms *cmd, void *dummy, char *arg, char *arg2)
     } else if (strcmp(arg, "ChildInitScript") == 0) {
 	dsc->dtcl_child_init_script = objarg;
     } else if (strcmp(arg, "ChildExitScript") == 0) {
-	dsc->dtcl_child_exit_script = objarg;
-    } else if (strcmp(arg, "BeforeScript") == 0) {
-	dsc->dtcl_before_script = objarg;
+	dsc->dtcl_child_exit_script = objarg;      
+    } else if (strcmp(arg, "BeforeScript") == 0) {       
+	if (ddc == NULL)
+	    dsc->dtcl_before_script = objarg; 
+	else 
+	    ddc->dtcl_before_script = objarg;
     } else if (strcmp(arg, "AfterScript") == 0) {
-	dsc->dtcl_after_script = objarg;
+	if (ddc == NULL)
+	    dsc->dtcl_after_script = objarg;
+	else
+	    ddc->dtcl_after_script = objarg;
     } else if (strcmp(arg, "ErrorScript") == 0) {
-	dsc->dtcl_error_script = objarg;
+	if (ddc == NULL)
+	    dsc->dtcl_error_script = objarg;
+	else
+	    ddc->dtcl_error_script = objarg;
     } else {
 	return "Mod_Dtcl Error: Dtcl_Script must have a second argument, which is one of: GlobalInitScript, ChildInitScript, ChildExitScript, BeforeScript, AfterScript";
     }
     return NULL;
 }
 
-const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
+static const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
 {
     server_rec *s = cmd->server;
     dtcl_server_conf *dsc = (dtcl_server_conf *)ap_get_module_config(s->module_config, &dtcl_module);
@@ -1009,7 +1000,7 @@ const char *set_cachesize(cmd_parms *cmd, void *dummy, char *arg)
     return NULL;
 }
 
-const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
+static const char *set_uploaddir(cmd_parms *cmd, void *dummy, char *arg)
 {
     upload_dir = arg;
     return NULL;
@@ -1025,7 +1016,30 @@ const char *set_filestovar(cmd_parms *cmd, void *dummy, char *arg)
     return NULL;
 }
 
-void *create_dtcl_config(pool *p, server_rec *s)
+/* function to get a config, and merge the directory/server options  */
+static dtcl_server_conf *dtcl_get_conf(request_rec *r)
+{
+    dtcl_server_conf *newconfig = NULL;
+    dtcl_server_conf *dsc = NULL; /* server config */
+    dtcl_server_conf *ddc = NULL; /* directory config */
+    void *dconf = r->per_dir_config;
+
+    dsc = (dtcl_server_conf *) ap_get_module_config(r->server->module_config, &dtcl_module);
+
+    if (dconf != NULL) 
+    {
+	newconfig = (dtcl_server_conf *) ap_pcalloc(r->pool, sizeof(dtcl_server_conf));
+	ddc = (dtcl_server_conf *) ap_get_module_config(dconf, &dtcl_module);
+	newconfig->dtcl_before_script = ddc->dtcl_before_script ? ddc->dtcl_before_script : dsc->dtcl_before_script;	
+	newconfig->dtcl_after_script = ddc->dtcl_after_script ? ddc->dtcl_after_script : dsc->dtcl_after_script;	
+	newconfig->dtcl_error_script = ddc->dtcl_error_script ? ddc->dtcl_error_script : dsc->dtcl_error_script;
+		
+	return newconfig;
+    }
+    return dsc;
+}
+
+static void *create_dtcl_config(pool *p, server_rec *s)
 {
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
 
@@ -1040,6 +1054,12 @@ void *create_dtcl_config(pool *p, server_rec *s)
     return dsc;
 }
 
+void *create_dtcl_dir_config(pool *p, char *dir)
+{
+    dtcl_server_conf *ddc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
+    return ddc;
+}
+
 void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 {
     dtcl_server_conf *dsc = (dtcl_server_conf *) ap_pcalloc(p, sizeof(dtcl_server_conf));
@@ -1047,14 +1067,26 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dtcl_server_conf *overrides = (dtcl_server_conf *) overridesv;
 
     dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
+
+#if 0 /* this stuff should only be done once at the top level  */
     dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ? overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
+
     dsc->dtcl_child_init_script = overrides->dtcl_child_init_script ? overrides->dtcl_child_init_script : base->dtcl_child_init_script;     
-    dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ? overrides->dtcl_child_exit_script : base->dtcl_child_exit_script;
-    dsc->dtcl_before_script = overrides->dtcl_before_script ? overrides->dtcl_before_script : base->dtcl_before_script;
-    dsc->dtcl_after_script = overrides->dtcl_after_script ? overrides->dtcl_after_script : base->dtcl_after_script;
-    dsc->dtcl_error_script = overrides->dtcl_error_script ? overrides->dtcl_error_script : base->dtcl_error_script;
+
+    dsc->dtcl_child_exit_script = overrides->dtcl_child_exit_script ? overrides->dtcl_child_exit_script : base->dtcl_child_exit_script; 
+
     dsc->dtcl_cache_size = overrides->dtcl_cache_size ? overrides->dtcl_cache_size : base->dtcl_cache_size;
+#endif
+
+    dsc->dtcl_before_script = overrides->dtcl_before_script ? overrides->dtcl_before_script : base->dtcl_before_script;
+
+    dsc->dtcl_after_script = overrides->dtcl_after_script ? overrides->dtcl_after_script : base->dtcl_after_script;
+
+    dsc->dtcl_error_script = overrides->dtcl_error_script ? overrides->dtcl_error_script : base->dtcl_error_script;
+
+
     dsc->server_name = overrides->server_name ? overrides->server_name : base->server_name; 
+
     return dsc;
 }
 
@@ -1098,7 +1130,7 @@ const handler_rec dtcl_handlers[] =
 
 const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript scriptname.tcl"},
+    {"Dtcl_Script", set_script, NULL, OR_FILEINFO, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript scriptname.tcl"},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
     {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},
@@ -1110,7 +1142,7 @@ module MODULE_VAR_EXPORT dtcl_module =
 {
     STANDARD_MODULE_STUFF,
     dtcl_init_handler,		/* initializer */
-    NULL,			/* dir config creater */
+    create_dtcl_dir_config,	/* dir config creater */
     NULL,			/* dir merger --- default is to override */
     create_dtcl_config,         /* server config */
     merge_dtcl_config,          /* merge server config */
@@ -1130,7 +1162,7 @@ module MODULE_VAR_EXPORT dtcl_module =
 };
 
 /*
-Local Variables: ***
-compile-command: "./builddtcl.sh shared" ***
-End: ***
+  Local Variables: ***
+  compile-command: "./builddtcl.sh shared" ***
+  End: ***
 */
