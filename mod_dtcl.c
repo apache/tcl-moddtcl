@@ -384,8 +384,9 @@ static int get_ttml_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inte
     if (toplevel)
     {
 	Tcl_SetStringObj(outbuf, "namespace eval request {\n", -1);
-	if (dsc->dtcl_before_script)
+	if (dsc->dtcl_before_script) {
 	    Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
+	} 
 	Tcl_AppendToObj(outbuf, "buffer_add \"", -1);
     }
     else
@@ -848,15 +849,17 @@ static const char *set_script(cmd_parms *cmd, dtcl_server_conf *ddc, char *arg, 
     } else if (strcmp(arg, "ChildExitScript") == 0) {
 	dsc->dtcl_child_exit_script = objarg;
     } else if (strcmp(arg, "BeforeScript") == 0) {
-	if (ddc == NULL)
+	if (ddc == NULL) {
 	    dsc->dtcl_before_script = objarg;
-	else
+	} else {
 	    ddc->dtcl_before_script = objarg;
+	}
     } else if (strcmp(arg, "AfterScript") == 0) {
-	if (ddc == NULL)
+	if (ddc == NULL) {
 	    dsc->dtcl_after_script = objarg;
-	else
+	} else {
 	    ddc->dtcl_after_script = objarg;
+	}
     } else if (strcmp(arg, "ErrorScript") == 0) {
 	if (ddc == NULL)
 	    dsc->dtcl_error_script = objarg;
@@ -1027,6 +1030,7 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
 
     dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
 
+    fprintf(stderr, "merge_dtcl_config\n");
 #if 0 /* this stuff should only be done once at the top level  */
     dsc->dtcl_global_init_script = overrides->dtcl_global_init_script ? overrides->dtcl_global_init_script :	base->dtcl_global_init_script;
 
@@ -1092,7 +1096,7 @@ const handler_rec dtcl_handlers[] =
 
 const command_rec dtcl_cmds[] =
 {
-    {"Dtcl_Script", set_script, NULL, OR_FILEINFO, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript scriptname.tcl"},
+    {"Dtcl_Script", set_script, NULL, RSRC_CONF, TAKE2, "Dtcl_Script GlobalInitScript|ChildInitScript|ChildExitScript|BeforeScript|AfterScript|ErrorScript \"tcl source code\""},
     {"Dtcl_CacheSize", set_cachesize, NULL, RSRC_CONF, TAKE1, "Dtcl_Cachesize cachesize"},
     {"Dtcl_UploadDirectory", set_uploaddir, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadDirectory dirname"},
     {"Dtcl_UploadMaxSize", set_uploadmax, NULL, RSRC_CONF, TAKE1, "Dtcl_UploadMaxSize size"},
@@ -1106,7 +1110,7 @@ module MODULE_VAR_EXPORT dtcl_module =
     STANDARD_MODULE_STUFF,
     dtcl_init_handler,		/* initializer */
     create_dtcl_dir_config,	/* dir config creater */
-    NULL,			/* dir merger --- default is to override */
+    NULL,                       /* dir merger --- default is to override */
     create_dtcl_config,         /* server config */
     merge_dtcl_config,          /* merge server config */
     dtcl_cmds,                  /* command table */
