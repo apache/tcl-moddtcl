@@ -5,33 +5,29 @@
 # You may have to change these if 'builddtcl.sh' and 'findconfig.tcl'
 # don't work.
 
-TCL_LIB=$(TCL_LIB_FLAG)
-OPTIM=$(TCL_CFLAGS_OPTIMIZE)
-CC=$(TCL_CC)
-CFLAGS_SHLIB=$(TCL_SHLIB_CFLAGS) -DSHARED_MODULE
-LDFLAGS_SHLIB=-Bshareable
+# You must change the following line unless you have the Debian
+# apache-dev package
 
-DEBUG=-g
-CFLAGS=-Wall $(OPTIM) $(EXTRA_CFLAGS)
-# You must change the following line unless you have the Debian apache-dev package
 INCLUDES=-I/usr/include/apache-1.3/
 INCDIR=$(SRCDIR)/include
 
 STATICLIB=mod_dtcl.a
-SHLIB=mod_dtcl.so
+SHLIB=mod_dtcl$(TCL_SHLIB_SUFFIX)
 
 APREQ_OBJECTS=apache_cookie.o apache_multipart_buffer.o apache_request.o
 OBJECTS=mod_dtcl.o tcl_commands.o $(APREQ_OBJECTS)
 
-COMPILE=$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) $<
+# The following TCL_* variables are all exported from builddtcl.sh
+
+COMPILE=$(TCL_CC) $(TCL_CFLAGS_DEBUG) $(TCL_CFLAGS_OPTIMIZE) $(TCL_CFLAGS_WARNING) $(TCL_SHLIB_CFLAGS) -c $(INCLUDES) $(CFLAGS) $(TCL_EXTRA_CFLAGS) $<
 
 all: builddtcl_test shared
 
 static: $(OBJECTS)
-	ar cr $(STATICLIB) $(OBJECTS) 
+	$(TCL_STLIB_LD) $(STATICLIB) $(OBJECTS) 
 
 shared: $(OBJECTS)
-	$(LD) $(LDFLAGS_SHLIB) -o $(SHLIB) $(OBJECTS) $(TCL_LIB)
+	$(TCL_SHLIB_LD) -o $(SHLIB) $(OBJECTS) $(TCL_LIB_SPEC) $(TCL_LIBS)
 
 # I don't have too many C files, so it's just clearer to do things by
 # hand

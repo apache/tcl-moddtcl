@@ -53,16 +53,25 @@ fi
 # find location of tclConfig.sh, source it, and export variables to
 # make them available to 'make'
 
-. `$TCLSH ./findconfig.tcl`
+export CONFIG=`$TCLSH ./findconfig.tcl`
+echo "Using tclConfig.sh: $CONFIG"
+. $CONFIG
 
-export TCL_VERSION
 export TCL_CC
+export TCL_CFLAGS_DEBUG 
+export TCL_CFLAGS_OPTIMIZE 
+export TCL_CFLAGS_WARNING 
+export TCL_EXTRA_CFLAGS
+export TCL_LIBS
+export TCL_LIB_FLAG 
+export TCL_LIB_SPEC
 export TCL_SHLIB_CFLAGS
-export TCL_CFLAGS_OPTIMIZE
-export TCL_LIB_FLAG
+export TCL_SHLIB_LD
+export TCL_SHLIB_SUFFIX
+export TCL_STLIB_LD 
 
 export BUILDDTCL="YES"
-export C_INCLUDE_PATH
+#export C_INCLUDE_PATH
 
 # pass the first argument to make
 make -e $1

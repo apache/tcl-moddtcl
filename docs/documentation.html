@@ -237,8 +237,8 @@
 	  URI. <b>Must</b> be done in the first block of TCL code.
 	</li>
 	<li>
-	  <code><b>headers setcookie <i>cookie-name
-		cookie-value ?-expires date/time? ?-domain domain?
+	  <code><b>headers setcookie <i>-name cookie-name
+		-value cookie-value ?-expires date/time? ?-domain domain?
 		?-path path? ?-secure?</i></b></code><br>
 
 	  This command is for setting cookies.  Cookie-name is
@@ -345,7 +345,11 @@
 	  .ttml files to the new format by using the
 	  <code>newtags.sh</code> script in the contrib/ directory.
 	  Run it at the top level of your DocumentRoot.
-
+	</li>
+	<li><b>headers setcookie</b><br>
+	  The <code>headers setcookie</code> command now uses the
+	  <code>-name</code> and <code>-value</code> flags for those
+	  arguments, whereas this was not necessary in the past.
 	</li>
       </ul>
 
@@ -370,7 +374,11 @@
 	</li>
       </ul>
 
-      <!--
-      Local Variables: ***      
-      End: ***
-      -->
+      
+      <!-- The load dtd is so that I can work on the documentation
+      with emacs' SGML in all its glory - davidw  -->
+
+      <!-- Local Variables: -->
+      <!-- eval: (sgml-load-dtd "~/html.ced") -->
+      <!-- End: -->
+      
