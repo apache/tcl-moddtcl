@@ -18,26 +18,19 @@ INCLUDES=-I/usr/include/apache-1.3/
 INCDIR=$(SRCDIR)/include
 STATICLIB=mod_dtcl.a
 SHLIB=mod_dtcl.so
+APREQ_OBJECTS=apache_cookie.o apache_multipart_buffer.o apache_request.o
+OBJECTS=mod_dtcl.o tcl_commands.o $(APREQ_OBJECTS)
 
 all: builddtcl_test lib shlib
 
-static: lib
-lib: $(STATICLIB)
+static: $(OBJECTS)
+	ar cr $(STATICLIB) $(OBJECTS) 
 
-.c.o:  
+.c.o: mod_dtcl.h
 	$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) -DDTCL_VERSION=\"`cat VERSION`\" $<
 
-.o.a:
-	ar cr $(STATICLIB) $*.o
-
-shared: shlib
-shlib: $(SHLIB)
-
-.SUFFIXES: .so .a
-
-.o.so:
-	mv $*.o $*-so.o
-	$(LD) $(LDFLAGS_SHLIB) -o $@ $*-so.o $(TCL_LIB)
+shared: $(OBJECTS) 
+	$(LD) $(LDFLAGS_SHLIB) -o $(SHLIB) $(OBJECTS) $(TCL_LIB)
 
 clean: 
 	-rm -f $(STATICLIB) $(SHLIB) *.o *~
