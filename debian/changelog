@@ -1,3 +1,10 @@
+libapache-mod-dtcl (0.11.7-1) unstable; urgency=low
+
+  * mod_dtcl.c (execute_and_check): Make sure to output results of
+    ErrorScript.
+
+ -- David N. Welton <davidw@debian.org>  Thu, 18 Apr 2002 15:01:30 +0200
+
 libapache-mod-dtcl (0.11.6-1) unstable; urgency=low
 
   * Fixed problem with 'var' command.  Variables with similar names
@@ -20,7 +27,7 @@ libapache-mod-dtcl (0.11.5-1) unstable; urgency=low
 libapache-mod-dtcl (0.11.4-1) unstable; urgency=low
 
   * Fixed bug in Parse command.
-  
+
   * Added Debian SSL config stuff from János Holányi (closes: #115333)
 
  -- David N. Welton <davidw@debian.org>  Mon, 15 Oct 2001 20:43:40 +0200
@@ -41,11 +48,11 @@ libapache-mod-dtcl (0.11.2-1) unstable; urgency=low
  -- David N. Welton <davidw@debian.org>  Thu, 30 Aug 2001 11:08:17 +0200
 
 libapache-mod-dtcl (0.11.1-1) unstable; urgency=low
-  
-  * Fixed VARS variable, documentation updates.  
- 
+
+  * Fixed VARS variable, documentation updates.
+
   * Fixed build variables: (closes: #102208)
-  
+
  --
 
 -- David N. Welton <davidw@debian.org>  Fri, 27 Jul 2001 13:52:10 +0200
@@ -59,9 +66,9 @@ libapache-mod-dtcl (0.11.0-1) unstable; urgency=low
 libapache-mod-dtcl (0.10.1-0) unstable; urgency=low
 
   * Fixed file upload bug.
-  
+
   * Added ErrorScript directive.
-  
+
   * Update docs.
 
  -- David N. Welton <davidw@debian.org>  Tue,  1 May 2001 18:17:08 +0200
@@ -70,9 +77,9 @@ libapache-mod-dtcl (0.9.3-3) unstable; urgency=low
 
   * Upgraded apreq* stuff to deal with file uploads directly to apache
     variable.
-  
+
   * UPLOAD variables can now be lists.
-  
+
   * Switched syntax to <? ?>.
 
  -- David N. Welton <davidw@debian.org>  Tue, 20 Mar 2001 20:17:29 +0100
@@ -80,9 +87,9 @@ libapache-mod-dtcl (0.9.3-3) unstable; urgency=low
 libapache-mod-dtcl (0.9.3-2) unstable; urgency=low
 
   * Added build depends.
-  
+
   * Closes #85787.
-  
+
   * Closes #87251.
 
  -- David N. Welton <davidw@debian.org>  Mon, 26 Feb 2001 14:01:34 +0100
@@ -90,7 +97,7 @@ libapache-mod-dtcl (0.9.3-2) unstable; urgency=low
 libapache-mod-dtcl (0.9.3-1) unstable; urgency=low
 
   * New version.
-  
+
   * Cleaned up Debian build stuff, (Fixes #66402).
 
  -- David N. Welton <davidw@prosa.it>  Fri, 16 Feb 2001 14:11:55 +0100
@@ -98,9 +105,9 @@ libapache-mod-dtcl (0.9.3-1) unstable; urgency=low
 libapache-mod-dtcl (0.9.0-1) unstable; urgency=low
 
   * New version.
-  
+
   * Started using apreq code for file uploads and other stuff.
-  
+
   * Documentation changes.
 
  -- David N. Welton <davidw@debian.org>  Mon, 12 Feb 2001 19:52:59 +0100
@@ -108,15 +115,15 @@ libapache-mod-dtcl (0.9.0-1) unstable; urgency=low
 libapache-mod-dtcl (0.8.12-1) unstable; urgency=low
 
   * Various cookie fixes.
-  
+
   * New build system.
-  
+
  -- David N. Welton <davidw@prosa.it>  Sun,  5 Nov 2000 23:48:11 +0100
 
 libapache-mod-dtcl (0.8.8-2) unstable; urgency=low
 
   * Code to deal with before/after scripts.
-  
+
   * Rewrite of Apache directives.
 
  -- David N. Welton <davidw@linuxcare.com>  Tue, 26 Sep 2000 17:59:57 +0200
@@ -142,14 +149,14 @@ libapache-mod-dtcl (0.7.5-1) unstable; urgency=low
 
   * Changed hputs to use "" instead of {}, so that { and } may be escaped
     with backslashes.
-  
+
   * Changed output format for errors.
 
  -- David N. Welton <davidw@efn.org>  Wed, 19 Apr 2000 17:49:47 +0200
 
 libapache-mod-dtcl (0.7.3-2) frozen unstable; urgency=low
 
-  * Removed "code2html" target from build target.  
+  * Removed "code2html" target from build target.
   * Fixes #58431.
 
  -- David N. Welton <davidw@efn.org>  Fri,  3 Mar 2000 13:11:23 +0100
@@ -165,7 +172,7 @@ libapache-mod-dtcl (0.7.0-2) unstable; urgency=low
 
   * Made hputs, include, and buffer_add commands safe for binary and
     sparse data.
-  
+
   * Now able to output different mime types.
 
  -- David N. Welton <davidw@efn.org>  Sat, 18 Dec 1999 18:50:29 -0800
@@ -182,7 +189,7 @@ libapache-mod-dtcl (0.6.4-2) unstable; urgency=low
   * Fixed Lintian problems:
   * Set and remove links between /usr/doc and /usr/share/doc.
   * Added dh_installchangelogs.
-  
+
  -- David N. Welton <davidw@efn.org>  Sun, 14 Nov 1999 15:15:51 -0800
 
 libapache-mod-dtcl (0.6.4-1) unstable; urgency=low
@@ -267,7 +274,7 @@ libapache-mod-dtcl (0.5.0-1) unstable; urgency=low
   improves both portability an error messaging.
   * All "wrong args" are implemented with the standard Tcl_WrongNumArgs call.
   * Thanks Paolo!
-	
+
  -- David N. Welton <davidw@efn.org>  Sun, 14 Mar 1999 14:47:03 -0800
 
 libapache-mod-dtcl (0.4.6-1) unstable; urgency=low
@@ -277,7 +284,7 @@ libapache-mod-dtcl (0.4.6-1) unstable; urgency=low
   switch between TCL and HTML modes!
   * Initiated switch to Tcl 'objects'.
   * Beginings of a user manual in use.html.
-	
+
  -- David N. Welton <davidw@efn.org>  Sun, 14 Mar 1999 14:47:03 -0800
 
 libapache-mod-dtcl (0.4.5-1) unstable; urgency=low
@@ -337,7 +344,7 @@ libapache-mod-dtcl (0.3-1) frozen unstable; urgency=low
   * Added patch by (rolf@pointsman.de), which eliminates need for global_request_rec, and instead makes use of ClientData.
   * Added preliminary POST functionality, copied, and modified, from mod_cgi.
   * Compiled under Apache 1.3.3.
-	
+
  -- David N. Welton <davidw@efn.org>  Mon, 23 Nov 1998 22:54:03 -0800
 
 libapache-mod-dtcl (0.2-3) unstable; urgency=low
@@ -361,7 +368,7 @@ libapache-mod-dtcl (0.2-1) unstable; urgency=low
 
 libapache-mod-dtcl (0.1-3) unstable; urgency=low
 
-  * Added a few things to the docs. 
+  * Added a few things to the docs.
 
  -- David N. Welton <davidw@efn.org>  Fri, 24 Jul 1998 10:35:20 -0700
 

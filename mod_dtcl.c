@@ -225,10 +225,10 @@ static int get_tcl_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inter
 	return TCL_ERROR;
     }
 
-    if (dsc->dtcl_before_script) 
+    if (dsc->dtcl_before_script)
 	Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
     result = Tcl_ReadChars(chan, outbuf, (int)r->finfo.st_size, 1);
-    if (dsc->dtcl_after_script) 
+    if (dsc->dtcl_after_script)
 	Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
 
     if (result < 0)
@@ -337,11 +337,10 @@ static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r
         }
 /*                  "</pre><b>OUTPUT BUFFER</b><pre>\n",
                     Tcl_GetStringFromObj(outbuf, (int *)NULL));  */
-    } else {
-        /* We make sure to flush the output if buffer_add was the only output */
-        print_headers(r);
-        flush_output_buffer(r);
     }
+    /* We make sure to flush the output if buffer_add was the only output */
+    print_headers(r);
+    flush_output_buffer(r);
     return OK;
 }
 
