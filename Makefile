@@ -53,7 +53,7 @@ version:
 docs/documentation.html:
 	$(TCLSH) ./docs/split.tcl docs/install.html docs/directives.html docs/commands.html docs/other.html > docs/documentation.html
 
-docs/documentation.txt:
+docs/documentation.txt: docs/documentation.html
 	if test -x `which html2text` ; then html2text ./docs/documentation.html > ./docs/documentation.txt ; else echo "You need html2text to create documentation.txt from documentation.html" ; fi
 
 dist: clean docs/documentation.txt version
