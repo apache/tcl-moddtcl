@@ -23,7 +23,7 @@ SHLIB=mod_dtcl.so
 APREQ_OBJECTS=apache_cookie.o apache_multipart_buffer.o apache_request.o
 OBJECTS=mod_dtcl.o tcl_commands.o $(APREQ_OBJECTS)
 
-COMPILE=$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) -DDTCL_VERSION=\"`cat VERSION`\" $<
+COMPILE=$(CC) $(DEBUG) -c $(INCLUDES) $(CFLAGS) $<
 
 all: builddtcl_test shared
 
