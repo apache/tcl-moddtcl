@@ -1,3 +1,10 @@
+libapache-mod-dtcl (0.12.1-1) unstable; urgency=low
+
+   * tcl_commands.c (HGetVars): Don't call ap_clear_table, as it can
+     interfere with other modules, like mod_unique_id.
+
+ -- David N. Welton <davidw@debian.org>  Wed, 11 Sep 2002 18:17:15 -0700
+
 libapache-mod-dtcl (0.12.0-1) unstable; urgency=low
 
   * New array for client header information - CLIENT_ENVS.  ENVS variables

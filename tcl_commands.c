@@ -381,8 +381,6 @@ int HGetVars(ClientData clientData, Tcl_Interp *interp, int objc, Tcl_Obj *CONST
     Tcl_IncrRefCount(ClientEnvsObj);
 #endif
     date = globals->r->request_time;
-    /* ensure that the system area which holds the cgi variables is empty */
-    ap_clear_table(globals->r->subprocess_env);
 
     /* retrieve cgi variables */
     ap_add_cgi_vars(globals->r);
