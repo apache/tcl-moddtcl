@@ -312,7 +312,7 @@ int dtcl_upload_hook(void *ptr, char *buf, int len, ApacheUpload *upload)
 
 /* Load, cache and eval a Tcl file  */
 
-static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, struct stat *finfo, Tcl_Obj *outbuf)
+static int get_tcl_file(request_rec *r, Tcl_Interp *interp, char *filename, Tcl_Obj *outbuf)
 {
     int result = 0;
 #if 1
@@ -497,7 +497,7 @@ int get_parse_exec_file(request_rec *r, dtcl_server_conf *dsc, int toplevel)
 	    result = get_ttml_file(r, dsc, interp, r->filename, 1, outbuf);
 	} else {
 	    /* It's a plain Tcl file */
-	    result = get_tcl_file(r, interp, r->filename, &(r->finfo), outbuf);
+	    result = get_tcl_file(r, interp, r->filename, outbuf);
 	}
 	if (result != TCL_OK)
 	    return result;
@@ -1025,7 +1025,6 @@ void *merge_dtcl_config(pool *p, void *basev, void *overridesv)
     dtcl_server_conf *base = (dtcl_server_conf *) basev;
     dtcl_server_conf *overrides = (dtcl_server_conf *) overridesv;
 
-    fprintf(stderr, __FUNCTION__ "\n");
     dsc->server_interp = overrides->server_interp ? overrides->server_interp : base->server_interp;
 
 #if 0 /* this stuff should only be done once at the top level  */
