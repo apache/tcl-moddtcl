@@ -1,3 +1,13 @@
+libapache-mod-dtcl (0.10.1-0) unstable; urgency=low
+
+  * Fixed file upload bug.
+  
+  * Added ErrorScript directive.
+  
+  * Update docs.
+
+ -- David N. Welton <davidw@debian.org>  Tue,  1 May 2001 18:17:08 +0200
+
 libapache-mod-dtcl (0.9.3-3) unstable; urgency=low
 
   * Upgraded apreq* stuff to deal with file uploads directly to apache
