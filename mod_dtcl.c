@@ -95,13 +95,7 @@ static int execute_and_check(Tcl_Interp *interp, Tcl_Obj *outbuf, request_rec *r
 /* just need some arbitrary non-NULL pointer which can't also be a request_rec */
 #define NESTED_INCLUDE_MAGIC	(&dtcl_module)
 
-/* Just a flag to let us know that the module has already been loaded once -
-   see tcl_init_stuff for details */
-static int already_loaded=0;
-
-#ifdef THREADED_TCL 
-static Tcl_Condition *sendMutex;
-#endif /* THREADED_TCL */
+TCL_DECLARE_MUTEX(sendMutex);
 
 /* Set up the content type header */
 
@@ -446,9 +440,8 @@ static int send_content(request_rec *r)
     dtcl_interp_globals *globals = NULL;
     dtcl_server_conf *dsc = NULL;
 
-#ifdef THREADED_TCL
-	Tcl_MutexLock(sendMutex);
-#endif /* THREADED_TCL */
+	Tcl_MutexLock(&sendMutex);
+
     dsc = dtcl_get_conf(r);
     globals = ap_pcalloc(r->pool, sizeof(dtcl_interp_globals));
     globals->r = r;
@@ -619,9 +612,7 @@ cleanup:
     *(dsc->headers_set) = 0;
     *(dsc->content_sent) = 0;
 
-#ifdef THREADED_TCL
-	Tcl_MutexUnlock(sendMutex);
-#endif /* THREADED_TCL */
+	Tcl_MutexUnlock(&sendMutex);
 
     return retval;
 }
@@ -654,15 +645,6 @@ static void tcl_init_stuff(server_rec *s, pool *p)
     dtcl_server_conf *dsc = (dtcl_server_conf *)
 	ap_get_module_config(s->module_config, &dtcl_module);
     server_rec *sr;
-
-    /* Apache actually loads all the modules twice, just to see if it
-     * can. This is a pain, because things don't seem to get
-     * completely cleaned up on the Tcl side. So this little hack
-     * should make us *really* load only the first time around. */
-
-	if (already_loaded > 0)
-		return;
-	already_loaded++;
 
     /* Initialize TCL stuff  */
     Tcl_FindExecutable(NULL);
@@ -756,11 +738,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 
 MODULE_VAR_EXPORT void dtcl_init_handler(server_rec *s, pool *p)
 {
-#if THREADED_TCL == 0
-    tcl_init_stuff(s, p);
-#endif
-#undef HIDE_DTCL_VERSION
-#ifndef HIDE_DTCL_VERSION
+#if HIDE_DTCL_VERSION == 0
     ap_add_version_component("mod_dtcl/"DTCL_VERSION);
 #else
     ap_add_version_component("mod_dtcl");
@@ -1015,10 +993,7 @@ void dtcl_child_init(server_rec *s, pool *p)
 {
     server_rec *sr;
     dtcl_server_conf *dsc;
-
-#if THREADED_TCL == 1
     tcl_init_stuff(s, p);
-#endif
 
     sr = s;
     while(sr)
