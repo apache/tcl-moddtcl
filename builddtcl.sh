@@ -59,6 +59,7 @@ CONFIG=`$TCLSH ./findconfig.tcl` ; export CONFIG
 echo "Using tclConfig.sh: $CONFIG"
 . $CONFIG
 
+export TCLSH
 export TCL_CC
 export TCL_CFLAGS_DEBUG 
 export TCL_CFLAGS_OPTIMIZE 
