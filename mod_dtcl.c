@@ -174,7 +174,7 @@ char *StringToUtf(char *input, ap_pool *pool)
     char *temp;
     Tcl_DString dstr;
     Tcl_DStringInit(&dstr);
-    Tcl_ExternalToUtfDString(NULL, input, strlen(input), &dstr);
+    Tcl_ExternalToUtfDString(NULL, input, (int)strlen(input), &dstr);
 
     temp = ap_pstrdup(pool, Tcl_DStringValue(&dstr));
     Tcl_DStringFree(&dstr);
@@ -227,7 +227,7 @@ static int get_tcl_file(request_rec *r, dtcl_server_conf *dsc, Tcl_Interp *inter
 
     if (dsc->dtcl_before_script) 
 	Tcl_AppendObjToObj(outbuf, dsc->dtcl_before_script);
-    result = Tcl_ReadChars(chan, outbuf, r->finfo.st_size, 1);
+    result = Tcl_ReadChars(chan, outbuf, (int)r->finfo.st_size, 1);
     if (dsc->dtcl_after_script) 
 	Tcl_AppendObjToObj(outbuf, dsc->dtcl_after_script);
 
@@ -497,7 +497,8 @@ static int send_content(request_rec *r)
     }
 #endif
 
-    ApacheRequest___parse(globals->req);
+    if ((errstatus = ApacheRequest___parse(globals->req)) != OK)
+	return errstatus;
 
     /* take results and create tcl variables from them */
 #if USE_ONLY_VAR_COMMAND == 0
@@ -687,7 +688,7 @@ static void tcl_init_stuff(server_rec *s, pool *p)
 	*(dsc->cache_free) = *(dsc->cache_size);
     }
     /* Initializing cache structures */
-    dsc->objCacheList = ap_pcalloc(p, *(dsc->cache_size) * sizeof(char *));
+    dsc->objCacheList = ap_pcalloc(p, (int)(*(dsc->cache_size) * sizeof(char *)));
     Tcl_InitHashTable(dsc->objCache, TCL_STRING_KEYS);
 
     sr = s;

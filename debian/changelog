@@ -1,3 +1,9 @@
+libapache-mod-dtcl (0.11.5-1) unstable; urgency=low
+
+  * Check return value for ApacheRequest___parse.
+
+ -- David N. Welton <davidw@debian.org>  Sat,  3 Nov 2001 17:38:08 +0100
+
 libapache-mod-dtcl (0.11.4-1) unstable; urgency=low
 
   * Fixed bug in Parse command.
