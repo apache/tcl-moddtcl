@@ -1,3 +1,9 @@
+libapache-mod-dtcl (0.11.0-1) unstable; urgency=low
+
+  * New variable command 'var'.
+
+ -- David N. Welton <davidw@debian.org>  Sat,  2 Jun 2001 19:18:30 +0200
+
 libapache-mod-dtcl (0.10.1-0) unstable; urgency=low
 
   * Fixed file upload bug.
@@ -319,6 +325,4 @@ libapache-mod-dtcl (0.1-1) unstable; urgency=low
 
  -- David N. Welton <davidw@efn.org>  Fri, 10 Jul 1998 20:01:35 -0700
 
-Local variables:
-mode: debian-changelog
-End:
+
